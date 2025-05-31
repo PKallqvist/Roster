@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SA Roster Scheduler</title>
+  <style>
+table.period-grid {
+  margin: 20px 0;
+  border: 2px solid #888;
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+table.period-grid td {
+  padding: 10px;
+  min-width: 60px;
+  background-color: #f9f9f9;
+}
+table.period-grid h3 {
+  margin-top: 30px;
+  font-size: 1.1em;
+  color: #333;
+}
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; margin-top: 20px; }
+    td, th { border: 1px solid #ccc; padding: 5px 10px; text-align: center; }
+    .swap1 { background-color: #ffeeba; }
+    .swap2 { background-color: #bee5eb; }
+    .goalieswap { background-color: #f5c6cb; }
+  </style>
+</head>
+<body>
+  <h1>Simulated Annealing Roster Scheduler</h1>
+  <label for="playerInput">Player Names (One name per row):</label><br>
+  <textarea id="playerInput" rows="7" cols="60" oninput="updatePlayers()">Alice
+Bob
+Charlie
+Diana
+Eve
+Frank
+Grace</textarea><br>
+
+	<label for="phasesPerPeriod">Substitution opportunities per period:</label>
+	<select id="phasesPerPeriod" onchange="updatePhases()">
+	  <option value="2" selected>1 (2 phases)</option>
+	  <option value="3">2 (3 phases)</option>
+	</select>
+
+  <br><br>
+  <button onclick="runSA()">Generate Schedule</button>
+  <button onclick="continueOptimize()">Continue Optimize</button>
+  <button onclick="randomizePlayers()">Randomize Players</button>
+  <div id="output" style="display: none;"></div>
+  <div id="score"></div>
+  <div id="namedGrid"></div>
+
+  <script>
+  
+	let players = [];
+	const positions = ['G', 'D', 'LW', 'RW', 'F', 'SUB1', 'SUB2'];
+	let phasesPerPeriod = 2;
+	let phases = phasesPerPeriod * 3;
+	let currentSchedule = null;
+	
+    window.onload = function() {
+      <!-- let players = []; -->
+      <!-- const positions = ['G', 'D', 'LW', 'RW', 'F', 'SUB1', 'SUB2']; -->
+      
+	  <!-- let phasesPerPeriod = 2 -->
+	  <!-- let phases = phasesPerPeriod * 3; -->
+      <!-- let currentSchedule = null; -->
+
+		window.updatePhases = function() {
+		  phasesPerPeriod = parseInt(document.getElementById("phasesPerPeriod").value, 10);
+		  phases = phasesPerPeriod * 3;
+		  console.log('Phases updated to:', phases);
+		}
+		
+		
+      window.updatePlayers = function() {
+        const input = document.getElementById("playerInput").value;
+        players = input.split(/[\n,]+/).map(p => p.trim()).filter(p => p);
+      }
+
+      function generateInitialState() {
+        const state = [];
+        for (let i = 0; i < phases; i++) {
+          const phasePlayers = [...players].sort(() => Math.random() - 0.5);
+          state.push(phasePlayers);
+        }
+        return state;
+      }
+
+	function applyGoalieLocks(state) {
+	  <!-- const phasesPerPeriod = subsPerPeriod; // e.g., 2 subs → 3 phases -->
+	  for (let phase = 0; phase < state.length; phase++) {
+		const periodIndex = Math.floor(phase / phasesPerPeriod);
+		const goalie = players[periodIndex % 3]; // Cycle through first 3 goalies
+		const filtered = state[phase].filter(p => p !== goalie);
+		state[phase] = [goalie, ...filtered];
+	  }
+	}
+	 
+	  
+function fitness(state) {
+  const playCounts = {};
+  const posHistory = {};
+  let penalty = 0;
+
+  for (const p of players) {
+    playCounts[p] = 0;
+    posHistory[p] = [];
+  }
+
+  for (let phase = 0; phase < phases; phase++) {
+    const currentPlayers = [];
+
+    for (let pos = 0; pos < positions.length; pos++) {
+      const player = state[phase][pos];
+      const isSub = isSubPosition(positions[pos]);
+
+      if (!isSub) playCounts[player]++;
+      posHistory[player].push(positions[pos]);
+      currentPlayers.push(player);
+    }
+
+    if (phase > 0) {
+	  const prev = state[phase - 1];
+	  const curr = state[phase];
+	  let stableCount = 0;
+	  let goalieChanged = prev[0] !== curr[0]; // goalie is always at index 0
+
+	  // Check stability of non-goalie positions (1–4)
+	  for (let i = 1; i <= 4; i++) {
+		if (prev[i] === curr[i]) stableCount++;
+	  }
+
+	  if (stableCount < 2 && !goalieChanged) {
+		// Penalize if not enough stability and goalie stayed the same
+		penalty += (2 - stableCount) * 20;
+	  }
+
+	  // Keep your existing sub change penalty logic
+	  const prevPlayers = new Set(prev);
+	  const currPlayers = new Set(curr);
+	  let changes = 0;
+	  for (const p of currPlayers) {
+		if (!prevPlayers.has(p)) changes++;
+	  }
+	  const subCount = changes / 2;
+	  penalty += Math.pow(subCount - 2, 2);
+	}
+
+  }
+
+  const nonGoalies = players.slice(3);
+  const times = nonGoalies.map(p => playCounts[p]);
+  const avgPlayTime = times.reduce((a, b) => a + b, 0) / times.length;
+
+  for (const p of players) {
+    const history = posHistory[p];
+    const subs = history.filter(isSubPosition).length;
+
+    // Penalize 3+ total subs
+    if (subs >= 3) penalty += Math.pow(subs - 2, 2) * 10;
+
+    // Penalize consecutive SUBs
+    for (let i = 1; i < history.length; i++) {
+      if (isSubPosition(history[i]) && isSubPosition(history[i - 1])) {
+        penalty += 10;
+      }
+    }
+
+    // Penalize 3+ consecutive same position (any)
+    let runLength = 1;
+    for (let i = 1; i < history.length; i++) {
+      if (history[i] === history[i - 1]) {
+        runLength++;
+        if (runLength >= 3) penalty += 5;
+      } else {
+        runLength = 1;
+      }
+    }
+
+    // Goalies: discourage >1 sub
+    if (isGoalie(p) && subs > 1) {
+      penalty += Math.pow(subs - 1, 2) * 5;
+    }
+
+    // Non-goalie playtime balance
+    if (!isGoalie(p)) {
+      const time = playCounts[p];
+      penalty += Math.pow(time - avgPlayTime, 2);
+    }
+
+    // Reward position variety
+    const uniqueCount = new Set(history.filter(h => !isSubPosition(h))).size;
+    penalty -= uniqueCount * 1.5;
+
+    // Encourage 2-phase consistency
+    for (let i = 1; i < history.length; i++) {
+      const prev = history[i - 1];
+      const curr = history[i];
+
+      if (!isSubPosition(prev) && !isSubPosition(curr)) {
+        if (curr === prev) penalty -= 1;
+        else penalty += 2;
+      }
+    }
+  }
+
+  return penalty;
+}
+
+// Helpers
+function isSubPosition(pos) {
+  return pos.startsWith("SUB");
+}
+
+function isGoalie(player) {
+  return player === players[0] || player === players[1] || player === players[2];
+}
+
+
+
+		function averageNonGoaliePlaytime() {
+		  const nonGoalies = players.filter(p => !isGoalie(p));
+		  return (phases * (positions.length - 3)) / nonGoalies.length; // 3 goalie positions assumed
+		}
+
+
+      function getNeighbor(state) {
+        const newState = JSON.parse(JSON.stringify(state));
+        const phase = Math.floor(Math.random() * phases);
+        let i = Math.floor(Math.random() * players.length);
+        let j = Math.floor(Math.random() * players.length);
+        if (i === 0 || j === 0) return newState;
+        [newState[phase][i], newState[phase][j]] = [newState[phase][j], newState[phase][i]];
+        return newState;
+      }
+
+      function optimizeSchedule(initialState, iterations = 5000, temp = 1000, alpha = 0.98) {
+        let current = initialState;
+        applyGoalieLocks(current);
+        let best = JSON.parse(JSON.stringify(current));
+        let bestScore = fitness(current);
+        let T = temp;
+        while (T > 1e-3 && iterations-- > 0) {
+          const neighbor = getNeighbor(current);
+          applyGoalieLocks(neighbor);
+          const delta = fitness(neighbor) - fitness(current);
+          if (delta < 0 || Math.random() < Math.exp(-delta / T)) {
+            current = neighbor;
+            const score = fitness(current);
+            if (score < bestScore) {
+              best = JSON.parse(JSON.stringify(neighbor));
+              bestScore = score;
+            }
+          }
+          T *= alpha;
+        }
+        return best;
+      }
+
+      function renderSchedule(schedule) {
+		document.getElementById('namedGrid').innerHTML = ''; // clear before adding new content
+
+        const phaseColors = Array(phases).fill(null).map(() => Array(positions.length).fill(''));
+
+        for (let i = 0; i < phases - 1; i++) {
+          const phase1 = schedule[i];
+          const phase2 = schedule[i + 1];
+          const sub1 = phase1[5];
+          const sub2 = phase1[6];
+          const idxSub1 = phase2.indexOf(sub1);
+          const idxSub2 = phase2.indexOf(sub2);
+          if (idxSub1 !== -1 && idxSub1 < 5) {
+            phaseColors[i][5] = 'swap1';
+            phaseColors[i][idxSub1] = 'swap1';
+          }
+          if (idxSub2 !== -1 && idxSub2 < 5) {
+            phaseColors[i][6] = 'swap2';
+            phaseColors[i][idxSub2] = 'swap2';
+          }
+        }
+
+        let idHtml = '<h3>Position Grid (Player Numbers)</h3><table><tr><th>Phase</th>' + positions.map(p => `<th>${p}</th>`).join('') + '</tr>';
+        schedule.forEach((phase, i) => {
+          idHtml += `<tr><td>${i + 1}</td>`;
+          phase.forEach((player, j) => {
+            const playerIndex = players.indexOf(player);
+            idHtml += `<td class="${phaseColors[i][j]}">${playerIndex + 1}</td>`;
+          });
+          idHtml += '</tr>';
+        });
+        idHtml += '</table>';
+        document.getElementById('output').innerHTML = idHtml;
+
+        let nameGrid = '<h3>Schedule by Phase</h3><table><tr><th>Phase</th>' + positions.map(p => `<th>${p}</th>`).join('') + '</tr>';
+        schedule.forEach((phase, i) => {
+          nameGrid += `<tr><td>${i + 1}</td>`;
+          phase.forEach((player, j) => {
+            nameGrid += `<td class="${phaseColors[i][j]}">${player}</td>`;
+          });
+          nameGrid += '</tr>';
+        });
+        nameGrid += '</table>';
+		
+		document.getElementById('namedGrid').innerHTML = nameGrid;
+		<!-- renderAllPeriods(schedule); // This will now append -->
+
+        const score = fitness(schedule);
+        document.getElementById('score').innerHTML = `<p>Score: ${score}</p>`;
+
+        renderAllPeriods(schedule);
+		<!-- document.getElementById('output').style.display = 'block'; -->
+      }
+
+      window.runSA = function() {
+        updatePlayers();
+        currentSchedule = optimizeSchedule(generateInitialState());
+        renderSchedule(currentSchedule);
+      }
+
+      <!-- window.randomizePlayers = function() { -->
+        <!-- updatePlayers(); -->
+        <!-- players = players.sort(() => Math.random() - 0.5); -->
+        <!-- document.getElementById("playerInput").value = players.join('\n'); -->
+        <!-- runSA();  -->
+		
+      <!-- }; -->
+
+		window.randomizePlayers = function() {
+		  updatePlayers();
+
+		  // Shuffle a copy of current players
+		  const shuffled = [...players].sort(() => Math.random() - 0.5);
+
+		  // Create a mapping from old name to new name
+		  const mapping = {};
+		  players.forEach((p, i) => mapping[p] = shuffled[i]);
+
+		  // Update playerInput text area with new order
+		  document.getElementById("playerInput").value = shuffled.join('\n');
+
+		  // Apply mapping to current schedule
+		  if (currentSchedule) {
+			currentSchedule = currentSchedule.map(phase =>
+			  phase.map(p => mapping[p])
+			);
+			players = shuffled;
+			renderSchedule(currentSchedule);
+		  }
+		};
+
+      window.continueOptimize = function() {
+        updatePlayers();
+        if (currentSchedule) {
+			for (let i = 0; i <100; i++) {
+			  currentSchedule = optimizeSchedule(currentSchedule);
+			}
+			renderSchedule(currentSchedule);
+        }
+      }
+    }
+	
+<!-- function renderAllPeriods(schedule) { -->
+  <!-- const layout = [ -->
+    <!-- ['-', 'F', '-', '-', '-', 'SUB1'], -->
+    <!-- ['LW', '-', 'RW', '-', '-', 'SUB2'], -->
+    <!-- ['-', 'D', '-', '-', '-', '-'], -->
+    <!-- ['-', 'G', '-', '-', '-', '-'] -->
+  <!-- ]; -->
+
+  <!-- const positionIndex = { -->
+    <!-- 'G': 0, -->
+    <!-- 'D': 1, -->
+    <!-- 'LW': 2, -->
+    <!-- 'RW': 3, -->
+    <!-- 'F': 4, -->
+    <!-- 'SUB1': 5, -->
+    <!-- 'SUB2': 6 -->
+  <!-- }; -->
+
+  <!-- function renderPeriod(pStart, pEnd, label) { -->
+    <!-- const phase1 = schedule[pStart]; -->
+    <!-- const phase2 = schedule[pEnd]; -->
+
+    <!-- function cellHTML(pos) { -->
+	  <!-- if (pos === '-') return '<td>-</td>'; -->
+	  <!-- const idx = positionIndex[pos]; -->
+	  <!-- const p1 = phase1[idx] || '-'; -->
+	  <!-- let subChange = ''; -->
+
+	  <!-- if (pos === 'SUB1' || pos === 'SUB2') { -->
+		<!-- const sub = p1; -->
+		<!-- const subInPos = phase2.indexOf(sub); -->
+		<!-- if (subInPos !== -1 && subInPos < 5) { // Only if sub moved to a field position -->
+		  <!-- const replaced = phase1[subInPos]; -->
+		  <!-- if (replaced !== sub) { -->
+			<!-- subChange = `<div style='font-size:0.8em; color:gray'>${replaced}</div>`; -->
+		  <!-- } -->
+		<!-- } -->
+	  <!-- } else { -->
+		<!-- const p2 = phase2[idx] || '-'; -->
+		<!-- if (p1 !== p2) { -->
+		  <!-- subChange = `<div style='font-size:0.8em; color:gray'>${p2}</div>`; -->
+		<!-- } -->
+	  <!-- } -->
+
+	  <!-- return `<td><div>${p1}</div>${subChange}</td>`; -->
+	<!-- } -->
+
+
+    <!-- let html = `<h3>${label}</h3><table class="period-grid">`; -->
+    <!-- layout.forEach(row => { -->
+      <!-- html += '<tr>' + row.map(cell => cellHTML(cell)).join('') + '</tr>'; -->
+    <!-- }); -->
+    <!-- html += '</table>'; -->
+    <!-- document.getElementById('namedGrid').innerHTML += html; -->
+  <!-- } -->
+
+  <!-- renderPeriod(0, 1, 'Period 1 (Phases 1 → 2)'); -->
+  <!-- renderPeriod(2, 3, 'Period 2 (Phases 3 → 4)'); -->
+  <!-- renderPeriod(4, 5, 'Period 3 (Phases 5 → 6)'); -->
+<!-- } -->
+function renderAllPeriods(schedule) {
+  const layout = [
+    ['-', 'F', '-', '-', '-', 'SUB1'],
+    ['LW', '-', 'RW', '-', '-', 'SUB2'],
+    ['-', 'D', '-', '-', '-', '-'],
+    ['-', 'G', '-', '-', '-', '-']
+  ];
+
+  const positionIndex = {
+    'G': 0,
+    'D': 1,
+    'LW': 2,
+    'RW': 3,
+    'F': 4,
+    'SUB1': 5,
+    'SUB2': 6
+  };
+
+  function renderPeriod(pStart, pEnd, label) {
+    const phase1 = schedule[pStart];
+    const phase2 = schedule[pEnd];
+
+    function cellHTML(pos) {
+      if (pos === '-') return '<td>-</td>';
+      const idx = positionIndex[pos];
+      const p1 = phase1[idx] || '-';
+      let subChange = '';
+
+      if (pos === 'SUB1' || pos === 'SUB2') {
+        const sub = p1;
+        const subInPos = phase2.indexOf(sub);
+        if (subInPos !== -1 && subInPos < 5) {
+          const replaced = phase1[subInPos];
+          if (replaced !== sub) {
+            subChange = `<div style='font-size:0.8em; color:gray'>${replaced}</div>`;
+          }
+        }
+      } else {
+        const p2 = phase2[idx] || '-';
+        if (p1 !== p2) {
+          subChange = `<div style='font-size:0.8em; color:gray'>${p2}</div>`;
+        }
+      }
+
+      return `<td><div>${p1}</div>${subChange}</td>`;
+    }
+
+    let html = `<h3>${label}</h3><table class="period-grid">`;
+    layout.forEach(row => {
+      html += '<tr>' + row.map(cell => cellHTML(cell)).join('') + '</tr>';
+    });
+    html += '</table>';
+    document.getElementById('namedGrid').insertAdjacentHTML('beforeend', html);
+
+  }
+
+  // Clear previous grids
+  <!-- document.getElementById('namedGrid').innerHTML = ''; -->
+
+  const totalPeriods = phases / phasesPerPeriod;
+  for (let p = 0; p < totalPeriods; p++) {
+    const start = p * phasesPerPeriod;
+    const end = start + 1;
+    const label = `Period ${p + 1} (Phases ${start + 1} → ${end + 1})`;
+    renderPeriod(start, end, label);
+  }
+}
+	
+
+</script>
+</body>
+</html>
