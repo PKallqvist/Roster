@@ -1,467 +1,662 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>SA Roster Scheduler</title>
-  <style>
-    table.period-grid {
-      margin: 20px 0;
-      border: 2px solid #888;
-      box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-    table.period-grid td {
-      padding: 10px;
-      min-width: 60px;
-      /* background-color: #f9f9f9; */
-    }
-    table.period-grid h3 {
-      margin-top: 30px;
-      font-size: 1.1em;
-      color: #333;
-    }
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    table { border-collapse: collapse; margin-top: 20px; }
-    td, th { border: 1px solid #ccc; padding: 5px 10px; text-align: center; }
-    .swap1 { background-color: #ffeeba; }
-    .swap2 { background-color: #bee5eb; }
-    .swap3 { background-color: #d4edda; }
-    .goalieswap { background-color: #f5c6cb; }
+	<head>
+		<meta charset="UTF-8">
+		<title>SA Roster Scheduler</title>
+		<style>
+      body {
+        /* font-family: Arial, sans-serif; */
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .emoji-symbol {
+        font-family: 'Noto Color Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
+        font-size: 1.0em;
+        /* line-height: 3.5; */
+        vertical-align: bottom;
+      }
 
-    td.next-g    { background-color: #fddde6; }
-    td.next-d    { background-color: #d6eaff; }
-    td.next-lw   { background-color: #ffe9cc; }
-    td.next-rw   { background-color: #e4fcd4; }
-    td.next-f    { background-color: #e0d6f5; }
-    td.next-sub  { background-color: #f0f0f0; }
+      table {
+        border-collapse: collapse;
+        margin-top: 20px;        
+       
+      }
 
-    .border-g   { border: 3px solid #f58aa3; }
-    .border-d   { border: 3px solid #8ac3ff; }
-    .border-lw  { border: 3px solid #ffc98b; }
-    .border-rw  { border: 3px solid #a9e88f; }
-    .border-f   { border: 3px solid #b6a4e3; }
-    .border-sub { border: 3px solid #ccc; }
+      td, th {
+        border: 1px solid #ccc;
+        padding: 5px 5px;
+        text-align: center;
+      }
+
+      /* --- Period Grid Styling --- */
+      table.period-grid {
+        margin: 20px 0;
+        border: 0;
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 6px;
+        overflow: hidden;
+        line-height: 1.3;
+      }
+
+      table.period-grid td {
+        padding: 8px;
+        min-width: 80px;
+      }
+
+      table.period-grid h3 {
+        margin-top: 30px;
+        font-size: 1.1em;
+        color: #333;
+      }
+      
+      table.period-grid td.no-border {
+        border: none !important; /* safely scoped only to these cells */
+      }
+      table.period-grid {
+        border-collapse: separate;
+        border-spacing: 1px; /* Adjust spacing as needed */
+      }
+
+      /* Restore role-based borders inside period grid */
+      .border-g   { border: 3px solid #f58aa3; }
+      .border-d   { border: 3px solid #8ac3ff; }
+      .border-lw  { border: 3px solid #ffc98b; }
+      .border-rw  { border: 3px solid #a9e88f; }
+      .border-f   { border: 3px solid #b6a4e3; }
+      .border-sub { border: 3px solid #ccc; }
 
 
-    th.position-header {
-      background-color: #f8f9fa;
-      font-weight: bold;
-    }
+      /* Swap/transition visuals */
+      .swap1      { background-color: #ffeeba; }
+      .swap2      { background-color: #bee5eb; }
+      .swap3      { background-color: #d4edda; }
+      .goalieswap { background-color: #f5c6cb; }
 
-  </style>
-</head>
-<body>
-  <h1>Simulated Annealing Roster Scheduler</h1>
-  <label for="playerInput">Player Names (One name per row):</label><br>
-  <textarea id="playerInput" rows="7" cols="60" oninput="updatePlayers()">Alice
+      /* Next-phase preview colors */
+      .next-g    { background-color: #fddde6; }
+      .next-d    { background-color: #d6eaff; }
+      .next-lw   { background-color: #ffe9cc; }
+      .next-rw   { background-color: #e4fcd4; }
+      .next-f    { background-color: #e0d6f5; }
+      .next-sub  { background-color: #f0f0f0; }
+
+      /* Header formatting */
+      th.position-header {
+        font-weight: bold;
+      }
+    </style>
+
+	</head>
+	<body>
+		<h1>Simulated Annealing Roster Scheduler</h1>
+		<label for="playerInput">Player Names (One name per row):</label><br>
+		<textarea id="playerInput" rows="7" cols="60" oninput="updatePlayers()">Alice
 Bob
 Charlie
 Diana
 Eve
 Frank
-Grace</textarea><br>
-
-	<label for="phasesPerPeriod">Substitution opportunities per period:</label>
-	<select id="phasesPerPeriod" onchange="updatePhases()">
-	  <option value="2" selected>1 (2 phases)</option>
-	  <option value="3">2 (3 phases)</option>
-	</select>
-
-  <br><br>
-  <button onclick="runSA()">Generate Schedule</button>
-  <button onclick="continueOptimize()">Continue Optimize</button>
-  <button onclick="randomizePlayers()">Randomize Players</button>
-  <div id="output" style="display: none;"></div>
-  <div id="score"></div>
-  <div id="namedGrid"></div>
-
-  <script>
-  
-	let players = [];
-  const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
-  let nrSubs = 0;
-  let subs = [];
-  let positions = [];
-  
-	let phasesPerPeriod = 2;
-	let phases = phasesPerPeriod * 3;
-	let currentSchedule = null;
-	
-  function isSubPosition(pos) {
-    return pos.startsWith("SUB");
-  }
-
-    window.onload = function() {
-   
-
-		window.updatePhases = function() {
-		  phasesPerPeriod = parseInt(document.getElementById("phasesPerPeriod").value, 10);
-		  phases = phasesPerPeriod * 3;
-		  console.log('Phases updated to:', phases);
-		}
-		
-		
-      window.updatePlayers = function () {
-        const input = document.getElementById("playerInput").value;
-        players = input.split(/[\n,]+/).map(p => p.trim()).filter(p => p);
-
-        nrSubs = players.length - 5;
-        subs = Array.from({ length: nrSubs }, (_, i) => `SUB${i + 1}`);
-        positions = basePositions.concat(subs);
-      };
-
-      function generateInitialState() {
-        const state = [];
-        for (let i = 0; i < phases; i++) {
-          const phasePlayers = [...players].sort(() => Math.random() - 0.5);
-          state.push(phasePlayers);
+Grace
+Henry</textarea>
+		<br>
+		<label for="phasesPerPeriod">Substitution opportunities per period:</label>
+		<select id="phasesPerPeriod" onchange="updatePhases()">
+			<option value="2" selected>1 (2 phases)</option>
+			<option value="3">2 (3 phases)</option>
+		</select>
+		<br><br>
+		<button onclick="runSA()">Generate Schedule</button>
+		<button onclick="continueOptimize()">Continue Optimize</button>
+		<button onclick="randomizePlayers()">Randomize Players</button>
+		<div id="output" style="display: none;"></div>
+		<div id="score"></div>
+		<div id="namedGrid"></div>
+		<script>
+			let players = [];
+			 const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
+			 let nrSubs = 0;
+			 let subs = [];
+			 let positions = [];
+			 
+			let phasesPerPeriod = 2;
+			let phases = phasesPerPeriod * 3;
+			let currentSchedule = null;
+			
+        function isSubPosition(pos) {
+          return pos.startsWith("SUB");
         }
-        return state;
-      }
 
-	function applyGoalieLocks(state) {
-	  <!-- const phasesPerPeriod = subsPerPeriod; // e.g., 2 subs → 3 phases -->
-	  for (let phase = 0; phase < state.length; phase++) {
-		const periodIndex = Math.floor(phase / phasesPerPeriod);
-		const goalie = players[periodIndex % 3]; // Cycle through first 3 goalies
-		const filtered = state[phase].filter(p => p !== goalie);
-		state[phase] = [goalie, ...filtered];
-	  }
-	}
-
-
-function fitness(state) {
-  const playCounts = {};
-  const posHistory = {};
-  let penalty = 0;
-
-  // Count how many subs are used based on total players
-  const nrSubs = players.length - 5;  // 5 field positions
-  const targetPlaytime = (phases * 4) / (4 + nrSubs); // Expected time per non-goalie
-  const phasesPerPeriod = phases / 3;
-  const goaliePhaseTime = Math.floor(targetPlaytime / 3) / phasesPerPeriod;
-
-  // Init tracking
-  for (const p of players) {
-    playCounts[p] = 0;
-    posHistory[p] = [];
-  }
-
-  // Phase loop: accumulate playCounts and position history
-  for (let phase = 0; phase < phases; phase++) {
-    const currentPlayers = [];
-
-    for (let pos = 0; pos < positions.length; pos++) {
-      const player = state[phase][pos];
-      const isSub = isSubPosition(positions[pos]);
-
-      if (!isSub) {
-        if (pos === 0) {
-          // Rule: goalie only gets partial credit per phase
-          playCounts[player] += goaliePhaseTime;
-        } else {
-          playCounts[player] += 1;
-        }
-      }
-
-      posHistory[player].push(positions[pos]);
-      currentPlayers.push(player);
-    }
-
-    if (phase > 0) {
-      const prev = state[phase - 1];
-      const curr = state[phase];
-      let stableCount = 0;
-      const goalieChanged = prev[0] !== curr[0]; // goalie is index 0
-
-      // Rule 1: Penalize instability if goalie hasn’t changed
-      for (let i = 1; i <= 4; i++) {
-        if (prev[i] === curr[i]) stableCount++;
-      }
-
-      if (stableCount < 2 && !goalieChanged) {
-        penalty += (2 - stableCount) * 20;
-      }
-
-      // Rule 2: Penalize deviation from 2 substitutions per phase
-      const prevPlayers = new Set(prev);
-      const currPlayers = new Set(curr);
-      let changes = 0;
-      for (const p of currPlayers) {
-        if (!prevPlayers.has(p)) changes++;
-      }
-      const subCount = changes / 2;
-      penalty += Math.pow(subCount - 2, 2);
-    }
-  }
-
-  // Player loop: apply penalties and rewards
-  for (const p of players) {
-    const history = posHistory[p];
-    const subs = history.filter(isSubPosition).length;
-
-    // Rule 4: Penalize consecutive SUBs
-    for (let i = 1; i < history.length; i++) {
-      if (isSubPosition(history[i]) && isSubPosition(history[i - 1])) {
-        penalty += 10;
-      }
-    }
-
-    // Rule 6: Penalize 3+ consecutive same position
-    let runLength = 1;
-    for (let i = 1; i < history.length; i++) {
-      if (history[i] === history[i - 1]) {
-        runLength++;
-        if (runLength >= 3) penalty += 5;
-      } else {
-        runLength = 1;
-      }
-    }
-
-    // Rule 7: Goalies - discourage >1 sub (low priority for now)
-    if (isGoalie(p) && subs > 1) {
-      // Currently zero penalty (disabled logic)
-      // penalty += Math.pow(subs - 1, 2) * 5;
-    }
-
-    // Rule 5: Fair playtime for all players
-    const time = playCounts[p];
-    const dist = time - targetPlaytime;
-    penalty += 4 * dist * dist;
-
-    // Rule 8: Reward position variety
-    const uniqueCount = new Set(history.filter(h => !isSubPosition(h))).size;
-    penalty -= uniqueCount * 1.5;
-
-    // Rule 9: Encourage 2-phase consistency
-    for (let i = 1; i < history.length; i++) {
-      const prev = history[i - 1];
-      const curr = history[i];
-      if (!isSubPosition(prev) && !isSubPosition(curr)) {
-        if (curr === prev) penalty -= 1;
-        else penalty += 2;
-      }
-    }
-  }
-
-  return penalty;
-}
-
-// Helpers
-function isSubPosition(pos) {
-  return pos.startsWith("SUB");
-}
-
-function isGoalie(player) {
-  return player === players[0] || player === players[1] || player === players[2];
-}
-
-
-
-		function averageNonGoaliePlaytime() {
-		  const nonGoalies = players.filter(p => !isGoalie(p));
-		  return (phases * (positions.length - 3)) / nonGoalies.length; // 3 goalie positions assumed
-		}
-
-
-      function getNeighbor(state) {
-        const newState = JSON.parse(JSON.stringify(state));
-        const phase = Math.floor(Math.random() * phases);
-        let i = Math.floor(Math.random() * players.length);
-        let j = Math.floor(Math.random() * players.length);
-        if (i === 0 || j === 0) return newState;
-        [newState[phase][i], newState[phase][j]] = [newState[phase][j], newState[phase][i]];
-        return newState;
-      }
-
-      function optimizeSchedule(initialState, iterations = 5000, temp = 1000, alpha = 0.98) {
-        let current = initialState;
-        applyGoalieLocks(current);
-        let best = JSON.parse(JSON.stringify(current));
-        let bestScore = fitness(current);
-        let T = temp;
-        while (T > 1e-3 && iterations-- > 0) {
-          const neighbor = getNeighbor(current);
-          applyGoalieLocks(neighbor);
-          const delta = fitness(neighbor) - fitness(current);
-          if (delta < 0 || Math.random() < Math.exp(-delta / T)) {
-            current = neighbor;
-            const score = fitness(current);
-            if (score < bestScore) {
-              best = JSON.parse(JSON.stringify(neighbor));
-              bestScore = score;
-            }
-          }
-          T *= alpha;
-        }
-        return best;
-      }
-
-      function renderSchedule(schedule) {
-        document.getElementById('namedGrid').innerHTML = ''; // clear before adding new content
-
-        const phaseColors = Array(phases).fill(null).map(() => Array(positions.length).fill(''));
-
-        for (let i = 0; i < phases - 1; i++) {
-          const phase1 = schedule[i];
-          const phase2 = schedule[i + 1];
-
-          for (let subIdx = 5; subIdx < positions.length; subIdx++) {
-            const sub = phase1[subIdx];
-            const subInPhase2Idx = phase2.indexOf(sub);
-
-            if (subInPhase2Idx !== -1 && subInPhase2Idx < 5) {
-              phaseColors[i][subIdx] = `swap${subIdx - 4}`; // swap1, swap2, ...
-              phaseColors[i][subInPhase2Idx] = `swap${subIdx - 4}`;
-            }
-          }
-        }
+       const positionSymbols = {
+          // G: '🧤',    // Goalie
+          G: '🥅',    // Goalie
+          D: '🛡️',    // Defense
+          LW: '⬅️',   // Left Wing
+          RW: '➡️',   // Right Wing
+          F: '🎯',    // Forward
+          SUB: '🔁'   // Substitution
+        };
        
-        let idHtml = '<h3>Position Grid (Player Numbers)</h3><table><tr><th>Phase</th>' +
-          positions.map(p => `<th class="position-header">${p}</th>`).join('') + '</tr>';
+        const positionColors = {
+          G: '#f58aa3',
+          D: '#8ac3ff',
+          LW: '#ffc98b',
+          RW: '#a9e88f',
+          F: '#b6a4e3',
+          SUB: '#888'
+        };
 
-        schedule.forEach((phase, i) => {
-          idHtml += `<tr><td>${i + 1}</td>`;
-          phase.forEach((player, j) => {
-            const playerIndex = players.indexOf(player);
-            let nextPosClass = '';
-            if (i < phases - 1) {
-              const nextPhase = schedule[i + 1];
-              const nextIndex = nextPhase.indexOf(player);
-              const nextPos = positions[nextIndex] || '';
-              nextPosClass = 'next-' + (isSubPosition(nextPos) ? 'sub' : nextPos.toLowerCase());
-            }
-            idHtml += `<td class="${nextPosClass}">${playerIndex + 1}</td>`;
-          });
-          idHtml += '</tr>';
-        });
-        idHtml += '</table>';
-        document.getElementById('output').innerHTML = idHtml;
-
-        let nameGrid = '<h3>Schedule by Phase</h3><table><tr><th>Phase</th>' +
-          positions.map(p => `<th class="position-header">${p}</th>`).join('') + '</tr>';
-
-        schedule.forEach((phase, i) => {
-          nameGrid += `<tr><td>${i + 1}</td>`;
-          phase.forEach((player, j) => {
-            let nextPosClass = '';
-            if (i < phases - 1) {
-              const nextPhase = schedule[i + 1];
-              const nextIndex = nextPhase.indexOf(player);
-              const nextPos = positions[nextIndex] || '';
-              nextPosClass = 'next-' + (isSubPosition(nextPos) ? 'sub' : nextPos.toLowerCase());
-            }
-            nameGrid += `<td class="${nextPosClass}">${player}</td>`;
-          });
-          nameGrid += '</tr>';
-        });
-        nameGrid += '</table>';
-        document.getElementById('namedGrid').innerHTML = nameGrid;
-
-        const score = fitness(schedule);
-        document.getElementById('score').innerHTML = `<p>Score: ${score}</p>`;
-
-        renderAllPeriods(schedule);
-
-      }
-
-
-      window.runSA = function() {
-        updatePlayers();
-        currentSchedule = optimizeSchedule(generateInitialState());
-        renderSchedule(currentSchedule);
-      }
-
-
-		window.randomizePlayers = function() {
-		  updatePlayers();
-
-		  // Shuffle a copy of current players
-		  const shuffled = [...players].sort(() => Math.random() - 0.5);
-
-		  // Create a mapping from old name to new name
-		  const mapping = {};
-		  players.forEach((p, i) => mapping[p] = shuffled[i]);
-
-		  // Update playerInput text area with new order
-		  document.getElementById("playerInput").value = shuffled.join('\n');
-
-		  // Apply mapping to current schedule
-		  if (currentSchedule) {
-			currentSchedule = currentSchedule.map(phase =>
-			  phase.map(p => mapping[p])
-			);
-			players = shuffled;
-			renderSchedule(currentSchedule);
-		  }
-		};
-
-      window.continueOptimize = function() {
-        updatePlayers();
-        if (currentSchedule) {
-			for (let i = 0; i <100; i++) {
-			  currentSchedule = optimizeSchedule(currentSchedule);
+			
+			   window.onload = function() {
+			  
+			
+				window.updatePhases = function() {
+				  phasesPerPeriod = parseInt(document.getElementById("phasesPerPeriod").value, 10);
+				  phases = phasesPerPeriod * 3;
+				  console.log('Phases updated to:', phases);
+				}
+				
+				
+			     window.updatePlayers = function () {
+			       const input = document.getElementById("playerInput").value;
+			       players = input.split(/[\n,]+/).map(p => p.trim()).filter(p => p);
+			
+			       nrSubs = players.length - 5;
+			       subs = Array.from({ length: nrSubs }, (_, i) => `SUB${i + 1}`);
+			       positions = basePositions.concat(subs);
+			     };
+			
+			     function generateInitialState() {
+			       const state = [];
+			       for (let i = 0; i < phases; i++) {
+			         const phasePlayers = [...players].sort(() => Math.random() - 0.5);
+			         state.push(phasePlayers);
+			       }
+			       return state;
+			     }
+			
+			function applyGoalieLocks(state) {
+			  <!-- const phasesPerPeriod = subsPerPeriod; // e.g., 2 subs → 3 phases -->
+			  for (let phase = 0; phase < state.length; phase++) {
+				const periodIndex = Math.floor(phase / phasesPerPeriod);
+				const goalie = players[periodIndex % 3]; // Cycle through first 3 goalies
+				const filtered = state[phase].filter(p => p !== goalie);
+				state[phase] = [goalie, ...filtered];
+			  }
 			}
-			renderSchedule(currentSchedule);
+			
+			function isSwapPatternAllowed(prev, curr) {
+			 const prevGoalie = prev[0];
+			 const currGoalie = curr[0];
+			 const goalieChanged = prevGoalie !== currGoalie;
+			 const goalieMovedOut = curr.includes(prevGoalie); // old goalie still on field
+			 const goalieReplacementIsSub = isSubPosition(positions[0]);
+			
+			 // Count unchanged field players (positions 1–4)
+			 let stableCount = 0;
+			 for (let i = 1; i <= 4; i++) {
+			   if (prev[i] === curr[i]) stableCount++;
+			 }
+			 const fieldSwaps = 4 - stableCount;
+			
+			 if (goalieChanged) {
+			   return (
+			     (!goalieMovedOut && goalieReplacementIsSub && fieldSwaps === 2) || // Case 1
+			     (goalieMovedOut && goalieReplacementIsSub && fieldSwaps === 1) ||  // Case 2
+			     (goalieMovedOut && !goalieReplacementIsSub && fieldSwaps === 1) || // Case 3
+			     (goalieMovedOut && !goalieReplacementIsSub && fieldSwaps === 2)    // Case 4
+			   );
+			 } else {
+			   // Goalie didn't change → allow if 2+ field players stayed
+			   return stableCount >= 2;
+			 }
+			}  
+			
+			function fitness(state) {
+			 const playCounts = {};
+			 const posHistory = {};
+			 let penalty = 0;
+			
+			 // Count how many subs are used based on total players
+			 const nrSubs = players.length - 5;  // 5 field positions
+			 const targetPlaytime = (phases * 5) / players.length; // Expected play time
+			 const phasesPerPeriod = phases / 3;
+			 // const goaliePhaseTime = Math.floor(targetPlaytime / 3) / phasesPerPeriod;
+			 const goaliePhaseTime = targetPlaytime / 3 / phasesPerPeriod;
+			
+			 // Init tracking
+			 for (const p of players) {
+			   playCounts[p] = 0;
+			   posHistory[p] = [];
+			 }
+			
+			 // Phase loop: accumulate playCounts and position history
+			 for (let phase = 0; phase < phases; phase++) {
+			   const currentPlayers = [];
+			
+			   for (let pos = 0; pos < positions.length; pos++) {
+			     const player = state[phase][pos];
+			     const isSub = isSubPosition(positions[pos]);
+			
+			     if (!isSub) {
+			       if (pos === 0) {
+			         // Rule: goalie only gets partial credit per phase
+			         playCounts[player] += goaliePhaseTime;
+			       } else {
+			         playCounts[player] += 1;
+			       }
+			     }
+			
+			     posHistory[player].push(positions[pos]);
+			     currentPlayers.push(player);
+			   }
+			
+			   if (phase > 0) {
+			     const prev = state[phase - 1];
+			     const curr = state[phase];
+			     let stableCount = 0;
+			     const goalieChanged = prev[0] !== curr[0]; // goalie is index 0
+			
+			     // // Rule 1: Penalize instability if goalie hasn’t changed
+			     // for (let i = 1; i <= 4; i++) {
+			     //   if (prev[i] === curr[i]) stableCount++;
+			     // }
+			
+			     // if (goalieChanged) {
+			     //   if (stableCount < 1) {
+			     //     penalty += (1 - stableCount) * 10;
+			     //   }
+			     // } else {
+			     //   if (stableCount < 2) {
+			     //     penalty += (2 - stableCount) * 20;
+			     //   }
+			     // }
+			     if (!isSwapPatternAllowed(prev, curr)) {
+			       penalty += 10; // or tweak weight
+			     }
+			
+			
+			     // Rule 2: Penalize deviation from 2 substitutions per phase
+			     const prevPlayers = new Set(prev);
+			     const currPlayers = new Set(curr);
+			     let changes = 0;
+			     for (const p of currPlayers) {
+			       if (!prevPlayers.has(p)) changes++;
+			     }
+			     const subCount = changes / 2;
+			     penalty += 5 * Math.pow(subCount - 2, 2);
+			   }
+			 }
+			 // Rule X: Penalize every player swap per position across all phases
+			 for (let pos = 0; pos < positions.length; pos++) {
+			   for (let phase = 1; phase < phases; phase++) {
+			     if (state[phase][pos] !== state[phase - 1][pos]) {
+			       penalty += 3;
+			     }
+			   }
+			 }
+       // Rule X: Penalize sub time imbalance
+        const subCounts = players.map(p => posHistory[p].filter(isSubPosition).length);
+        const maxSubs = Math.max(...subCounts);
+        const minSubs = Math.min(...subCounts);
+        penalty += (maxSubs - minSubs) * 20;
+			
+			 // Player loop: apply penalties and rewards
+			 for (const p of players) {
+			   const history = posHistory[p];
+			   const subs = history.filter(isSubPosition).length;
+			
+			   // Rule 4: Penalize consecutive SUBs
+			   let subPen=0;
+			   for (let i = 1; i < history.length; i++) {
+			     if (isSubPosition(history[i]) && isSubPosition(history[i - 1])) {
+			       subPen += subPen*2 + 3;
+			     }
+			   }
+			   penalty+= subPen
+			
+			   // Rule 6: Penalize 3+ consecutive same position
+			   let runLength = 1;
+			   const posCounts = {};
+			
+			   for (let i = 0; i < history.length; i++) {
+			     const pos = history[i];
+			     posCounts[pos] = (posCounts[pos] || 0) + 1;
+			
+			     if (i > 0 && pos === history[i - 1]) {
+			       runLength++;
+			       if (runLength >= 3) penalty += 5;
+			     } else {
+			       runLength = 1;
+			     }
+			   }
+			
+			   // Rule 6b: Penalize deviation from 2 uses per non-goalie, non-sub position
+			   for (const pos in posCounts) {
+			     if (!isSubPosition(pos) && pos !== 'G') {
+			       const delta = 2*(posCounts[pos] - 2);
+			       penalty += delta * delta;
+			     }
+			   }
+			
+			   // Rule 7: Goalies - discourage >1 sub (low priority for now)
+			   if (isGoalie(p) && subs > 1) {
+			     // Currently zero penalty (disabled logic)
+			     // penalty += Math.pow(subs - 1, 2) * 5;
+			   }
+			
+			   // Rule 5: Fair playtime for all players
+			   const time = playCounts[p];
+			   const dist = time - targetPlaytime;
+			   penalty += 4 * dist * dist;
+			
+			   // Rule 8: Reward position variety
+			   const uniqueCount = new Set(history.filter(h => !isSubPosition(h))).size;
+			   penalty -= uniqueCount * 1.5;
+			
+			   // Rule 9: Encourage 2-phase consistency
+			   for (let i = 1; i < history.length; i++) {
+			     const prev = history[i - 1];
+			     const curr = history[i];
+			     if (!isSubPosition(prev) && !isSubPosition(curr)) {
+			       if (curr === prev) penalty -= 1;
+			       else penalty += 2;
+			     }
+			   }
+			 }
+			
+			 return penalty;
+			}
+			
+			// Helpers
+			function isSubPosition(pos) {
+			 return pos.startsWith("SUB");
+			}
+			
+			function isGoalie(player) {
+			 return player === players[0] || player === players[1] || player === players[2];
+			}
+			
+			
+			
+				function averageNonGoaliePlaytime() {
+				  const nonGoalies = players.filter(p => !isGoalie(p));
+				  return (phases * (positions.length - 3)) / nonGoalies.length; // 3 goalie positions assumed
+				}
+			
+			
+			     function getNeighbor(state) {
+			       const newState = JSON.parse(JSON.stringify(state));
+			       const phase = Math.floor(Math.random() * phases);
+			       let i = Math.floor(Math.random() * players.length);
+			       let j = Math.floor(Math.random() * players.length);
+			       while (j === i) {
+			         j = Math.floor(Math.random() * players.length);
+			       }
+			       if (i === 0 || j === 0) return newState;
+			       [newState[phase][i], newState[phase][j]] = [newState[phase][j], newState[phase][i]];
+			       return newState;
+			     }
+			
+			     function optimizeSchedule(initialState, iterations = 5000, temp = 1000, alpha = 0.98) {
+			       let current = initialState;
+			       applyGoalieLocks(current);
+			       let best = JSON.parse(JSON.stringify(current));
+			       let bestScore = fitness(current);
+			       let T = temp;
+			       while (T > 1e-3 && iterations-- > 0) {
+			         const neighbor = getNeighbor(current);
+			         applyGoalieLocks(neighbor);
+			         const delta = fitness(neighbor) - fitness(current);
+			         if (delta < 0 || Math.random() < Math.exp(-delta / T)) {
+			           current = neighbor;
+			           const score = fitness(current);
+			           if (score < bestScore) {
+			             best = JSON.parse(JSON.stringify(neighbor));
+			             bestScore = score;
+			           }
+			         }
+			         T *= alpha;
+			       }
+			       return best;
+			     }
+			
+			     function renderSchedule(schedule) {
+			       document.getElementById('namedGrid').innerHTML = ''; // clear before adding new content
+			
+			       const phaseColors = Array(phases).fill(null).map(() => Array(positions.length).fill(''));
+			
+			       for (let i = 0; i < phases - 1; i++) {
+			         const phase1 = schedule[i];
+			         const phase2 = schedule[i + 1];
+			
+			         for (let subIdx = 5; subIdx < positions.length; subIdx++) {
+			           const sub = phase1[subIdx];
+			           const subInPhase2Idx = phase2.indexOf(sub);
+			
+			           if (subInPhase2Idx !== -1 && subInPhase2Idx < 5) {
+			             phaseColors[i][subIdx] = `swap${subIdx - 4}`; // swap1, swap2, ...
+			             phaseColors[i][subInPhase2Idx] = `swap${subIdx - 4}`;
+			           }
+			         }
+			       }
+			      
+			       let idHtml = '<h3>Position Grid (Player Numbers)</h3><table><tr><th>Phase</th>' +
+			         positions.map(p => `<th class="position-header">${p}</th>`).join('') + '</tr>';
+			
+			       schedule.forEach((phase, i) => {
+			         idHtml += `<tr><td>${i + 1}</td>`;
+			         phase.forEach((player, j) => {
+			           const playerIndex = players.indexOf(player);
+			           let nextPosClass = '';
+			           if (i < phases - 1) {
+			             const nextPhase = schedule[i + 1];
+			             const nextIndex = nextPhase.indexOf(player);
+			             const nextPos = positions[nextIndex] || '';
+			             nextPosClass = 'next-' + (isSubPosition(nextPos) ? 'sub' : nextPos.toLowerCase());
+			           }
+			           idHtml += `<td class="${nextPosClass}">${playerIndex + 1}</td>`;
+			         });
+			         idHtml += '</tr>';
+			       });
+			       idHtml += '</table>';
+			       document.getElementById('output').innerHTML = idHtml;
+			
+             renderPlayerPositionGrid(currentSchedule);
+			       // let nameGrid = '<h3>Schedule by Phase</h3><table><tr><th>Phase</th>' +
+			       //   positions.map(p => `<th class="position-header">${p}</th>`).join('') + '</tr>';
+			       let nameGrid = '<h3>Schedule by Phase</h3><table><tr><th>Phase</th>' +
+			       positions.map(p => {
+			         const role = isSubPosition(p) ? 'sub' : p.toLowerCase();
+			         return `<th class="position-header next-${role}">${p}</th>`;
+			       }).join('') +
+			       '</tr>';
+			       
+			       schedule.forEach((phase, i) => {
+			         nameGrid += `<tr><td>${i + 1}</td>`;
+			         phase.forEach((player, j) => {
+			           let nextPosClass = '';
+			           if (i < phases - 1) {
+			             const nextPhase = schedule[i + 1];
+			             const nextIndex = nextPhase.indexOf(player);
+			             const nextPos = positions[nextIndex] || '';
+			             nextPosClass = 'next-' + (isSubPosition(nextPos) ? 'sub' : nextPos.toLowerCase());
+			           }
+			           nameGrid += `<td class="${nextPosClass}">${player}</td>`;
+			         });
+			         nameGrid += '</tr>';
+			       });
+			       nameGrid += '</table>';
+			       document.getElementById('namedGrid').innerHTML = nameGrid;
+			
+			       const score = fitness(schedule);
+			       console.log(schedule);
+			       document.getElementById('score').innerHTML = `<p>Score: ${score}</p>`;
+			
+			       renderAllPeriods(schedule);
+			
+			     }
+			
+			
+			     window.runSA = function() {
+			       updatePlayers();
+			       currentSchedule = optimizeSchedule(generateInitialState());
+			       renderSchedule(currentSchedule);
+			     }
+			
+			
+				window.randomizePlayers = function() {
+				  updatePlayers();
+			
+				  // Shuffle a copy of current players
+				  const shuffled = [...players].sort(() => Math.random() - 0.5);
+			
+				  // Create a mapping from old name to new name
+				  const mapping = {};
+				  players.forEach((p, i) => mapping[p] = shuffled[i]);
+			
+				  // Update playerInput text area with new order
+				  document.getElementById("playerInput").value = shuffled.join('\n');
+			
+				  // Apply mapping to current schedule
+				  if (currentSchedule) {
+					currentSchedule = currentSchedule.map(phase =>
+					  phase.map(p => mapping[p])
+					);
+					players = shuffled;
+					renderSchedule(currentSchedule);
+				  }
+				};
+			
+			     window.continueOptimize = function() {
+			       updatePlayers();
+			       if (currentSchedule) {
+					for (let i = 0; i <100; i++) {
+					  currentSchedule = optimizeSchedule(currentSchedule);
+					}
+					renderSchedule(currentSchedule);
+			       }
+			     }
+			   }
+			
+			function renderAllPeriods(schedule) {
+			   const container = document.getElementById('namedGrid');
+			   const totalPeriods = phases / phasesPerPeriod;
+			
+			   // Create updated layout for dynamic subs
+			   const layout = [
+			     ['-', 'F', '-', '-', ...(subs.length > 0 ? ['SUB1'] : [])],
+			     ['LW', '-', 'RW', '-', ...(subs.length > 1 ? ['SUB2'] : [])],
+			     ['-', 'D', '-', '-', ...(subs.length > 2 ? ['SUB3'] : [])],
+			     ['-', 'G', '-', '-', ...(subs.length > 3 ? ['SUB4'] : [])]
+			   ];
+			
+			   // Add more rows if needed
+			   for (let i = 4; i < Math.ceil(subs.length / 2) + 2; i++) {
+			     const newRow = ['-', '-', '-', '-', '-', '-'];
+			     const subIdx = i + 1;
+			     if (subs[subIdx]) newRow.push(`SUB${subIdx + 1}`);
+			     layout.push(newRow);
+			   }
+			
+			   container.innerHTML += `<h2>Period Layout Grids</h2>`;
+			
+			   for (let p = 0; p < totalPeriods; p++) {
+			     const start = p * phasesPerPeriod;
+			     const end = start + phasesPerPeriod;
+			     const label = `Period ${p + 1} (Phases ${start + 1} → ${end})`;
+			
+			     let html = `<h3>${label}</h3><table class="period-grid">`;
+			
+			     layout.forEach(row => {
+			       html += '<tr>';
+			       row.forEach(pos => {
+			         if (pos === '-') {
+			           html += `<td  class="no-border"></td>`;
+			         } else {
+			           const role = isSubPosition(pos) ? 'sub' : pos.toLowerCase();
+                  html += `<td class="border-${role} next-${role}">`;
+                  for (let phase = start; phase < end; phase++) {
+                    const player = schedule[phase][positions.indexOf(pos)] || '-';
+
+                    let nextSymbol = '';
+                    if (phase < phases - 1 && player !== '-') {
+                      const nextPhase = schedule[phase + 1];
+                      const nextIndex = nextPhase.indexOf(player);
+                      const nextPos = positions[nextIndex] || '';
+                      const symbolKey = isSubPosition(nextPos) ? 'SUB' : nextPos;
+                      nextSymbol = positionSymbols[symbolKey] || '';
+                    }
+
+                    html += `
+                      <div style="display: flex; justify-content: space-between; align-items: center; ">
+                        <span>${player}</span>
+                        <span class="emoji-symbol">${nextSymbol}</span>
+                      </div>`;
+                    // html += `<div style="display: flex; justify-content: space-between;"><span>${player}</span><span>${nextSymbol}</span></div>`;
+                  }
+                  html += `</td>`;
+
+			
+			         }
+			       });
+			       html += '</tr>';
+			     });
+			
+			     html += '</table>';
+			     container.insertAdjacentHTML('beforeend', html);
+			   }
+			}
+      function renderPlayerPositionGrid(state) {
+        const grid = getPlayerPositionGrid(state);
+        const positions = [...basePositions, 'SUB'];
+
+        let html = '<h3>Player Position Counts</h3><table border="1" cellpadding="5" cellspacing="0"><tr><th>Player</th>';
+
+        for (const pos of positions) {
+          html += `<th>${pos}</th>`;
         }
-      }
-    }
+        html += '</tr>';
 
-	function renderAllPeriods(schedule) {
-  const container = document.getElementById('namedGrid');
-  const totalPeriods = phases / phasesPerPeriod;
-
-  // Create updated layout for dynamic subs
-  const layout = [
-    ['-', 'F', '-', '-', '-', ...(subs.length > 0 ? ['SUB1'] : [])],
-    ['LW', '-', 'RW', '-', '-', ...(subs.length > 1 ? ['SUB2'] : [])],
-    ['-', 'D', '-', '-', '-', ...(subs.length > 2 ? ['SUB3'] : [])],
-    ['-', 'G', '-', '-', '-', ...(subs.length > 3 ? ['SUB4'] : [])]
-  ];
-
-  // Add more rows if needed
-  for (let i = 4; i < Math.ceil(subs.length / 2) + 2; i++) {
-    const newRow = ['-', '-', '-', '-', '-', '-'];
-    const subIdx = i + 1;
-    if (subs[subIdx]) newRow.push(`SUB${subIdx + 1}`);
-    layout.push(newRow);
-  }
-
-  container.innerHTML += `<h2>Period Layout Grids</h2>`;
-
-  for (let p = 0; p < totalPeriods; p++) {
-    const start = p * phasesPerPeriod;
-    const end = start + phasesPerPeriod;
-    const label = `Period ${p + 1} (Phases ${start + 1} → ${end})`;
-
-    let html = `<h3>${label}</h3><table class="period-grid">`;
-
-    layout.forEach(row => {
-      html += '<tr>';
-      row.forEach(pos => {
-        if (pos === '-') {
-          html += `<td>-</td>`;
-        } else {
-          const role = isSubPosition(pos) ? 'sub' : pos.toLowerCase();
-          html += `<td class="border-${role} next-${role}">`;
-          for (let phase = start; phase < end; phase++) {
-            const player = schedule[phase][positions.indexOf(pos)] || '-';
-            html += `<div>${player}</div>`;
+        for (const player of players) {
+          html += `<tr><td>${player}</td>`;
+          for (const pos of positions) {
+            html += `<td>${grid[player][pos]}</td>`;
           }
-          html += `</td>`;
-
+          html += '</tr>';
         }
-      });
-      html += '</tr>';
-    });
 
-    html += '</table>';
-    container.insertAdjacentHTML('beforeend', html);
-  }
-}
+        html += '</table>';
 
+        document.getElementById('output').innerHTML = html;
+        document.getElementById('output').style.display = 'block';
+      }
 
-</script>
-</body>
+			function getPlayerPositionGrid(state) {
+        const grid = {};
+        const allPositions = [...basePositions, 'SUB'];
+      
+        // Initialize empty grid
+        for (const player of players) {
+          grid[player] = {};
+          for (const pos of allPositions) {
+            grid[player][pos] = 0;
+          }
+        }
+      
+        // Fill counts
+        for (let phase = 0; phase < phases; phase++) {
+          for (let pos = 0; pos < positions.length; pos++) {
+            const player = state[phase][pos];
+            const positionName = isSubPosition(positions[pos]) ? 'SUB' : positions[pos];
+            grid[player][positionName]++;
+          }
+        }
+      
+        return grid;
+      }
+			
+			
+			
+		</script>
+	</body>
 </html>
