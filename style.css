@@ -55,6 +55,13 @@ table.period-grid td.no-border {
 .border-f   { border: 3px solid #b6a4e3; }
 .border-sub { border: 3px solid #ccc; }
 
+.border-g   { border: 3px solid #c14e6a; }  /* darker pink */
+.border-d   { border: 3px solid #4f9fe4; }  /* darker blue */
+.border-lw  { border: 3px solid #e39a3e; }  /* darker orange */
+.border-rw  { border: 3px solid #6bb84f; }  /* darker green */
+.border-f   { border: 3px solid #8b6cd1; }  /* darker purple */
+.border-sub { border: 3px solid #888888; }  /* darker gray */
+
 /* Swap Colors */
 .swap1      { background-color: #ffeeba; }
 .swap2      { background-color: #bee5eb; }

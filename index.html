@@ -3,12 +3,12 @@
 
 <head>
 	<meta charset="UTF-8">
-	<title>SA Roster Scheduler</title>
+	<title>Fotball Roster </title>
 	<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-	<h1>Simulated Annealing Roster Scheduler</h1>
+	<h1>Roster Creator [Simulated Annealing]</h1>
 	<label for="playerInput">Player Names (One name per row):</label><br>
 	<textarea id="playerInput" rows="7" cols="60" oninput="updatePlayers()">Alice
 Bob
@@ -344,9 +344,17 @@ Henry</textarea>
 									const symbolKey = isSubPosition(nextPos) ? 'SUB' : nextPos;
 
 									if (symbolKey === 'G') {
-										nextSymbol = `<img src="gloves.svg" alt="G" style="width: 24px; height: auto;" />`;
+										nextSymbol = `<img src="gloves.svg" alt="G" style="width: 24px; height: auto; " />`;
 									} else if (symbolKey === 'SUB') {
 										nextSymbol = `<img src="swap.svg" alt="G" style="width: 24px; height: auto;" />`;
+									} else if (symbolKey === 'LW') {
+										nextSymbol = `<img src="leftwing.svg" alt="G" style="width: 24px; height: auto;" />`;
+									} else if (symbolKey === 'RW') {
+										nextSymbol = `<img src="rightwing.svg" alt="G" style="width: 24px; height: auto;" />`;
+									} else if (symbolKey === 'D') {
+										nextSymbol = `<img src="defender.svg" alt="G" style="width: 24px; height: auto;" />`;
+									} else if (symbolKey === 'F') {
+										nextSymbol = `<img src="striker.svg" alt="G" style="width: 24px; height: auto;" />`;
 									} else {
 										nextSymbol = positionSymbols[symbolKey] || '';
 									}
