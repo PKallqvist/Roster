@@ -28,11 +28,23 @@ Henry</textarea>
 	<button onclick="runSA()">Generate Schedule</button>
 	<button onclick="continueOptimize()">Continue Optimize</button>
 	<button onclick="randomizePlayers()">Randomize Players</button>
+	<button onclick="window.print()">Print Schedule</button>
+
 	<div id="output" style="display: none;"></div>
 	<div id="score"></div>
 	<div id="namedGrid"></div>
-	<script src="fitness2.js"></script>
-	<script>
+	
+	<script type="module">
+		import { fitness2 } from './fitness2.js';
+		import {
+			getDefenderIcon,
+			getLeftWingIcon,
+			getRightWingIcon,
+			getStrikerIcon,
+			getSwapIcon,
+			getGlovesIcon
+		} from './icons.js';	
+
 		let players = [];
 		const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
 		let nrSubs = 0;
@@ -59,21 +71,16 @@ Henry</textarea>
 			SUB: '🔁'   // Substitution
 		};
 
-		// const positionColors = {
-		// 	G: '#f58aa3',
-		// 	D: '#8ac3ff',
-		// 	LW: '#ffc98b',
-		// 	RW: '#a9e88f',
-		// 	F: '#b6a4e3',
-		// 	SUB: '#888'
-		// };
+	
+		const rootStyles = getComputedStyle(document.documentElement);
+
 		const positionColors = {
-			G: '#e63950',   // Deeper goalie red/pink
-			D: '#3399ff',   // Bold defense blue
-			LW: '#ff9900',  // Stronger orange
-			RW: '#66cc33',  // Vivid green
-			F: '#9966cc',   // Richer purple
-			SUB: '#555555'  // Dark
+		G:   rootStyles.getPropertyValue('--color-g').trim(),
+		D:   rootStyles.getPropertyValue('--color-d').trim(),
+		LW:  rootStyles.getPropertyValue('--color-lw').trim(),
+		RW:  rootStyles.getPropertyValue('--color-rw').trim(),
+		F:   rootStyles.getPropertyValue('--color-f').trim(),
+		SUB: rootStyles.getPropertyValue('--color-sub').trim()
 		};
 
 
@@ -106,7 +113,7 @@ Henry</textarea>
 			}
 
 			function applyGoalieLocks(state) {
-				<!-- const phasesPerPeriod = subsPerPeriod; // e.g., 2 subs → 3 phases -->
+				// const phasesPerPeriod = subsPerPeriod; // e.g., 2 subs → 3 phases 
 				for (let phase = 0; phase < state.length; phase++) {
 					const periodIndex = Math.floor(phase / phasesPerPeriod);
 					const goalie = players[periodIndex % 3]; // Cycle through first 3 goalies
@@ -119,7 +126,7 @@ Henry</textarea>
 
 
 			function fitness(state) {
-				return fitness2(state);				
+				return fitness2(state, players, positions);				
 			}
 
 			// Helpers
@@ -218,9 +225,8 @@ Henry</textarea>
 				document.getElementById('output').innerHTML = idHtml;
 
 				renderPlayerPositionGrid(currentSchedule);
-				// let nameGrid = '<h3>Schedule by Phase</h3><table><tr><th>Phase</th>' +
-				//   positions.map(p => `<th class="position-header">${p}</th>`).join('') + '</tr>';
-				let nameGrid = '<h3>Schedule by Phase</h3><table><tr><th>Phase</th>' +
+				
+				let nameGrid = '<h3>Schedule by Phase</h3><table class="basic-grid"><tr><th>Phase</th>' +
 					positions.map(p => {
 						const role = isSubPosition(p) ? 'sub' : p.toLowerCase();
 						return `<th class="position-header next-${role}">${p}</th>`;
@@ -298,6 +304,9 @@ Henry</textarea>
 			const container = document.getElementById('namedGrid');
 			const totalPeriods = phases / phasesPerPeriod;
 
+			const dividerHeight = phasesPerPeriod === 2 ? '8px' : '2px';
+			document.documentElement.style.setProperty('--divider-height', dividerHeight);
+
 			// Create updated layout for dynamic subs
 			const layout = [
 				['-', 'F', '-', '-', ...(subs.length > 0 ? ['SUB1'] : [])],
@@ -314,80 +323,100 @@ Henry</textarea>
 				layout.push(newRow);
 			}
 
-			container.innerHTML += `<h2>Period Layout Grids</h2>`;
+			let fullHTML = `<h2>Period Layout Grids</h2><div id="print-area"><table class="period-grid">`;
 
 			for (let p = 0; p < totalPeriods; p++) {
 				const start = p * phasesPerPeriod;
 				const end = start + phasesPerPeriod;
-				const label = `Period ${p + 1} (Phases ${start + 1} → ${end})`;
+				// const label = `Period ${p + 1} (Phases ${start + 1} → ${end})`;
+				const label = `Period ${p + 1}`;
 
-				let html = `<h3>${label}</h3><table class="period-grid">`;
+				layout.forEach((row, rowIndex) => {
+				fullHTML += '<tr>';
+				if (rowIndex === 0) {
+					fullHTML += `<td class="period-label divider" rowspan="${layout.length}">${label}</td>`;
+				}
 
-				layout.forEach(row => {
-					html += '<tr>';
-					row.forEach(pos => {
-						if (pos === '-') {
-							html += `<td class="no-border"></td>`;
-						} else {
-							const role = isSubPosition(pos) ? 'sub' : pos.toLowerCase();
-							html += `<td class="border-${role} next-${role}">`;
+				row.forEach(pos => {
+					if (pos === '-') {
+					fullHTML += `<td class="no-border"></td>`;
+					} else {
+					const role = isSubPosition(pos) ? 'sub' : pos.toLowerCase();
+					fullHTML += `<td class="border-${role} next-${role}">`;
 
-							for (let phase = start; phase < end; phase++) {
-								const player = schedule[phase][positions.indexOf(pos)] || '-';
+					for (let phase = start; phase < end; phase++) {
+						const player = schedule[phase][positions.indexOf(pos)] || '-';
 
-								let nextSymbol = '';
-								let nextColor = '#000';
-								if (phase < phases - 1 && player !== '-') {
-									const nextPhase = schedule[phase + 1];
-									const nextIndex = nextPhase.indexOf(player);
-									const nextPos = positions[nextIndex] || '';
-									const symbolKey = isSubPosition(nextPos) ? 'SUB' : nextPos;
+						let nextSymbol = '';
+						let nextColor = '#000';
+						if (phase < phases - 1 && player !== '-') {
+						const nextPhase = schedule[phase + 1];
+						const nextIndex = nextPhase.indexOf(player);
+						const nextPos = positions[nextIndex] || '';
+						const symbolKey = isSubPosition(nextPos) ? 'SUB' : nextPos;
 
-									if (symbolKey === 'G') {
-										nextSymbol = `<img src="gloves.svg" alt="G" style="width: 24px; height: auto; " />`;
-									} else if (symbolKey === 'SUB') {
-										nextSymbol = `<img src="swap.svg" alt="G" style="width: 24px; height: auto;" />`;
-									} else if (symbolKey === 'LW') {
-										nextSymbol = `<img src="leftwing.svg" alt="G" style="width: 24px; height: auto;" />`;
-									} else if (symbolKey === 'RW') {
-										nextSymbol = `<img src="rightwing.svg" alt="G" style="width: 24px; height: auto;" />`;
-									} else if (symbolKey === 'D') {
-										nextSymbol = `<img src="defender.svg" alt="G" style="width: 24px; height: auto;" />`;
-									} else if (symbolKey === 'F') {
-										nextSymbol = `<img src="striker.svg" alt="G" style="width: 24px; height: auto;" />`;
-									} else {
-										nextSymbol = positionSymbols[symbolKey] || '';
-									}
-									nextColor = positionColors[symbolKey] || '#000';
-								}
+						const color = positionColors[symbolKey] || '#000';
 
-								const nameStyle = phase === start
-									? 'font-weight: 600; color: #111;'
-									: 'opacity: 0.85;';
-
-								html += `
-							<div style="display: flex; justify-content: space-between; align-items: center;">
-								<span style="${nameStyle}">${player}</span>
-								<span class="emoji-symbol" style="color: ${nextColor}">${nextSymbol}</span>
-							</div>`;
-							}
-
-							html += `</td>`;
+						switch (symbolKey) {
+							case 'G':
+							// nextSymbol = `<img src="gloves.svg" alt="G" style="width: 22px; height: auto;" />`;
+							nextSymbol = getGlovesIcon(color);
+							break;
+							case 'SUB':
+							nextSymbol = getSwapIcon(color);
+							break;
+							case 'LW':
+							nextSymbol = getLeftWingIcon(color);
+							break;
+							case 'RW':
+							nextSymbol = getRightWingIcon(color);
+							break;
+							case 'D':
+							nextSymbol = getDefenderIcon(color);
+							break;
+							case 'F':
+							nextSymbol = getStrikerIcon(color);
+							break;
+							default:
+							nextSymbol = positionSymbols[symbolKey] || '';
 						}
-					});
-					html += '</tr>';
-				});
 
-				html += '</table>';
-				container.insertAdjacentHTML('beforeend', html);
+						nextColor = positionColors[symbolKey] || '#000';
+						}
+
+						const nameStyle = phase === start
+						? 'font-weight: 600; color: #111;'
+						: 'opacity: 0.85;';
+
+						fullHTML += `
+						<div style="display: flex; justify-content: space-between; align-items: center;">
+							<span style="${nameStyle}">${player}</span>
+							<span class="emoji-symbol" style="color: ${nextColor}">${nextSymbol}</span>
+						</div>`;
+					}
+
+					fullHTML += `</td>`;
+					}
+				});
+				fullHTML += '</tr>';
+				});
+				if (p < totalPeriods - 1) {
+					fullHTML += `<tr class="period-spacer"><td colspan="${layout[0].length + 1}"></td></tr>
+								 <tr class="period-divider"><td colspan="${layout[0].length + 1}"></td></tr>`;
+					
+				}
 			}
+
+			fullHTML += '</table></div>';
+			container.insertAdjacentHTML('beforeend', fullHTML);
 		}
+		
 
 		function renderPlayerPositionGrid(state) {
 			const grid = getPlayerPositionGrid(state);
 			const positions = [...basePositions, 'SUB'];
 
-			let html = '<h3>Player Position Counts</h3><table border="1" cellpadding="5" cellspacing="0"><tr><th>Player</th>';
+			let html = '<h3>Player Position Counts</h3><table class="basic-grid" border="1" cellpadding="5" cellspacing="0"><tr><th>Player</th>';
 
 			for (const pos of positions) {
 				html += `<th>${pos}</th>`;

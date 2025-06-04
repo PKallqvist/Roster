@@ -3,11 +3,15 @@
 // const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
 const outfieldStart = 1; // index for D
 const outfieldEnd = 5;   // index after F
-
+const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
+let players= [];
+let positions = [];
 
 
 // main fitness function
-function fitness2(state) {
+export function fitness2(state, all_players, all_positions) {
+	players = all_players;
+	positions = all_positions;
 	let weights = {
 		playtime: 5,
 		stability: 8,
