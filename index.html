@@ -82,7 +82,10 @@ Henry</textarea>
 		F:   rootStyles.getPropertyValue('--color-f').trim(),
 		SUB: rootStyles.getPropertyValue('--color-sub').trim()
 		};
+		let editMode = false;
+		let selectedCell = null;
 
+		
 
 		window.onload = function () {
 
@@ -123,7 +126,11 @@ Henry</textarea>
 			}
 
 			
-
+			window.toggleEditMode = function() {
+				editMode = !editMode;
+				selectedCell = null;
+				alert(editMode ? 'Edit mode ON' : 'Edit mode OFF');
+			}
 
 			function fitness(state) {
 				return fitness2(state, players, positions);				
@@ -182,6 +189,7 @@ Henry</textarea>
 				}
 				return best;
 			}
+
 
 			function renderSchedule(schedule) {
 				document.getElementById('namedGrid').innerHTML = ''; // clear before adding new content
@@ -243,11 +251,15 @@ Henry</textarea>
 							const nextPos = positions[nextIndex] || '';
 							nextPosClass = 'next-' + (isSubPosition(nextPos) ? 'sub' : nextPos.toLowerCase());
 						}
-						nameGrid += `<td class="${nextPosClass}">${player}</td>`;
+						// nameGrid += `<td class="${nextPosClass}">${player}</td>`;
+						nameGrid += `<td class="${nextPosClass}" onclick="handleCellClick(this, ${i}, ${j})">${player}</td>`;
+
 					});
 					nameGrid += '</tr>';
 				});
 				nameGrid += '</table>';
+				nameGrid += '<button onclick="toggleEditMode()">Edit Schedule</button>';
+
 				document.getElementById('namedGrid').innerHTML = nameGrid;
 
 				const score = fitness(schedule);
@@ -257,6 +269,29 @@ Henry</textarea>
 				renderAllPeriods(schedule);
 
 			}
+
+			window.handleCellClick =  function (cell, phaseIndex, playerIndex) {
+				if (!editMode) return;
+
+				if (selectedCell) {
+					if (selectedCell.phase === phaseIndex) {
+					// swap players
+					const tmp = currentSchedule[phaseIndex][selectedCell.index];
+					currentSchedule[phaseIndex][selectedCell.index] = currentSchedule[phaseIndex][playerIndex];
+					currentSchedule[phaseIndex][playerIndex] = tmp;
+
+					selectedCell = null;
+					renderSchedule(currentSchedule); // re-render all
+					} else {
+					alert("Swap must be within the same phase.");
+					selectedCell = null;
+					}
+				} else {
+					selectedCell = { cell, phase: phaseIndex, index: playerIndex };
+					cell.style.border = '2px solid red';
+				}
+				}
+
 
 
 			window.runSA = function () {
