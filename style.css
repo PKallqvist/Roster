@@ -128,7 +128,7 @@ th.position-header { font-weight: bold; }
 .period-divider td {
   border: none;  
   height: var(--divider-height);
-  border-top: 2px solid #888;
+  border-top: 1px solid #888;
   background: transparent;
   
 }
