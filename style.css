@@ -28,6 +28,10 @@ body {
     padding: 20px;
 }
 
+/* * {
+  outline: 1px solid red !important;
+} */
+
 .emoji-symbol {
     font-family: 'Noto Color Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
     font-size: 1.0em;
@@ -36,7 +40,7 @@ body {
 
 table {
     border-collapse: collapse;
-    margin-top: 20px;
+    /* margin-top: 20px; */
 }
 
 td,
@@ -71,7 +75,7 @@ table.period-grid h3 {
 
 table.period-grid td.no-border {
     border: none !important;
-    min-width: 10px;
+    min-width: 20px;
 }
 
 table.basic-grid td{
@@ -107,6 +111,56 @@ table.basic-grid td{
 /* Header Formatting */
 th.position-header { font-weight: bold; }
 
+.preference-table {
+	/* width: 100%; */
+	border-collapse: collapse;
+	font-family: sans-serif;
+}
+
+.preference-table th, .preference-table td {
+	padding: 0px 4px;
+	text-align: center;
+}
+
+.preference-table tr:nth-child(even) {
+	background-color: #f9f9f9;
+}
+
+.preference-table tr:nth-child(odd) {
+	background-color: #ffffff;
+}
+
+.preference-table input[type="number"],
+.preference-table input[type="text"] {
+	width: 48px;
+	padding: 2px 4px;
+	box-sizing: border-box;
+	border: 0px solid #ccc;
+	border-radius: 4px;
+}
+
+.preference-input {
+	width: 48px;
+    
+}
+.preference-name-input {
+	width: 80px;
+    border: 0px;
+}
+.preference-table button {
+	padding: 4px 10px;
+	border: none;
+	background-color: #007BFF;
+	color: white;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.preference-table button:hover {
+	background-color: #0056b3;
+}
+
+
 .period-label {
   writing-mode: vertical-lr;
   transform: rotate(180deg);
@@ -115,7 +169,7 @@ th.position-header { font-weight: bold; }
   text-align: center;
   background: #f0f0f0;
   border: none;
-  min-width: 20px;
+  min-width: 100px;
 }
 .period-spacer td {
   height: var(--divider-height);
@@ -133,33 +187,159 @@ th.position-header { font-weight: bold; }
   
 }
 
+button {
+  padding: 4px 12px;
+  margin: 1px; 
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+button:hover {
+  background: #e0e0e0;
+}
+
+button.active-button {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
+}
+.player-container {
+  display: block;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+/* extra view  */
+.visual-periods-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;              /* Fill available space */
+  max-width: 800px;         /* Set a reasonable max width */
+  /* margin: 0 auto;*/           /* Optional: center in page */
+}
+
+.visual-period {
+  padding-bottom: 0px;
+  margin-bottom: 10px;
+  width: 100%;              /* Match wrapper */
+}
+
+.visual-period:not(:last-child) {
+  border-bottom: 2px solid #ccc;
+}
+
+/* .visual-period td {
+  border: 0px;
+} */
+ .visual-period td:not(.visual-cell) {
+  border: 0;
+}
+
+.visual-table {
+  width: 100%;              /* Ensures table spans parent */
+  table-layout: fixed;      /* Makes cell widths consistent */
+  /* border-collapse: collapse; */
+  border-collapse: separate;      /* ← important */
+  border-spacing: 4px;            
+}
+
+.visual-cell {
+  /* border: 1px solid #ccc; */
+  padding: 6px;
+  min-width: 100px;
+  border: 0;
+  text-align: center;
+  vertical-align: middle;
+
+}
+.cell-content {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+.sub1 {
+  background-color: #c2f0c2;
+
+}
+.sub2 {
+  background-color: #d4e3ff;
+}
+
+.sub-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sub-line .symbol {
+  min-width: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.position-header.clickable {
+  cursor: pointer;
+  background-color: #f5f5f5;
+}
+
+.position-header.clickable:hover {
+  background-color: #e0e0e0;
+}
+
+
+
+/* print and narrow */
+
+@media (max-width: 700px) {
+  .player-container {
+    flex-direction: column;
+  }
+
+  .player-container > div {
+    width: 100%;
+  }
+}
+
+
 
 @media print {
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
 
-  #print-area, #print-area * {
-    visibility: visible;
+  #print-area-grid,
+  #print-area-visual {
+    display: none !important;
+    visibility: hidden !important;
   }
 
-  #print-area {
+  #print-area-grid:has(table):not([style*="display: none"]),
+  #print-area-visual:has(table):not([style*="display: none"]) {
+    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
+    visibility: visible !important;
   }
 
-  /* Ensure tables stack vertically with spacing */
-  #print-area table.period-grid {
-    page-break-inside: avoid;
-    margin-bottom: 20px;
+  #print-area-grid:has(table):not([style*="display: none"]) *:not(script),
+  #print-area-visual:has(table):not([style*="display: none"]) *:not(script) {
+    visibility: visible !important;
+  }
+  .sub1, .sub2 {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* Optional: ensure headers (h3) are printed and styled nicely */
-  #print-area h3 {
-    margin-top: 20px;
-    font-size: 1.2em;
-    color: #000;
+  .no-print {
+    display: none !important;
   }
 }
+

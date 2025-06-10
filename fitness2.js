@@ -6,52 +6,61 @@ const outfieldEnd = 5;   // index after F
 const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
 let players= [];
 let positions = [];
+let preferences = {};
+
+
+export function setPlayerPreferences(prefData) {
+  preferences = prefData;
+  //console.log(preferences);
+}
+
+export function setPlayers(playerData) {
+  players = playerData;
+}
 
 
 // main fitness function
-export function fitness2(state, all_players, all_positions) {
-	players = all_players;
-	positions = all_positions;
+export function fitness2(state) {
+
 	let weights = {
-		playtime: 5,
-		stability: 8,
-		consistency: 4,
-		diversity: 2,
-		diversityFairness: 3,
-		consecSubs: 6,
-		subFairness: 12
-	};
-
-	weights = {
-		playtime: 1,    // High value - optimise around equal playtime
-		stability: 0,
-		consistency: 20,
-		diversity: 1,
-		diversityFairness: 0,
-		consecSubs: 0,
-		subFairness: 1  // High value - weight * Abs(max - min)
-	};
-
-	weights = {
 		playtime: 1000,    // High value - optimise around equal playtime
 		stability: 8,
 		consistency: 20,
 		diversity: 5,
-		diversityFairness: 3,
+		diversityFairness: 4,
 		consecSubs: 10,
-		subFairness: 1000  // High value - weight * Abs(max - min)
+		subFairness: 1000,  // High value - weight * Abs(max - min)
+		preferedPosition: 1,
+		inPeriodSwapPenalty: 4 
+	};
+
+	weights = {
+		playtime: 100,    // High value - optimise around equal playtime
+		stability: 1,
+		consistency: 5,
+		diversity: 5,
+		diversityFairness: 2,
+		consecSubs: 1,
+		subFairness: 5,  // High value - weight * Abs(max - min)
+		preferedPosition: 2,
+		inPeriodSwapPenalty: 10
 	};
 
 
 	let score = 0;
+	//console.log("score so far:", score);
 	score += weights.playtime * ruleEqualPlaytime(state);
-	score += weights.stability * ruleOutfieldSwapStability(state);  // 
-	score += weights.consistency * ruleOutfieldConsistency(state);  // Per position, Same player two phases
+	score += weights.stability * ruleOutfieldSwapStability(state);  // 2 changes in the outfield per phase
+	score += weights.consistency * ruleOutfieldBlockConsistency(state , 2);  // Seek to maintain same position two phases
 	score += weights.diversity * rulePositionDiversity(state);
 	score += weights.diversityFairness * rulePositionDiversityFairness(state);
 	score += weights.consecSubs * ruleConsecutiveSubs(state);
 	score += weights.subFairness * ruleSubFairness(state);
-
+	score += weights.inPeriodSwapPenalty * ruleInPeriodOutfieldPositionSwitch(state);
+	
+	//console.log("score so far:", score);
+	score += weights.preferedPosition * rulePositionPreferenceMatch(state);
+	//console.log("score complete:", score);
 	return score;
 }
 
@@ -86,51 +95,38 @@ function ruleEqualPlaytime(state) {
 	return maxTime - minTime;
 }
 
-// Rule 2: Stability — outfield swaps per phase
 function ruleOutfieldSwapStability(state) {
+	const outfieldStart = 1; // Assuming 0 = goalie
+	const outfieldEnd = 5;   // Excludes subs
+
+	const idealSwaps = Math.min(players.length - basePositions.length, 2); // 1 sub → 1 ideal swap, 2+ subs → 2
+	
 	let penalty = 0;
 
-	const contribution = [-1, -3, 3, 2];
-
 	for (let phase = 1; phase < state.length; phase++) {
-		let phasePenalty = 2;
-		let contributionCount = 0;
+		const prevRow = state[phase - 1];
+		const currRow = state[phase];
+
+		let swapCount = 0;
 
 		for (let pos = outfieldStart; pos < outfieldEnd; pos++) {
-			const prevRow = state[phase - 1];
-			const currRow = state[phase];
-
-			const prevPlayer = prevRow[pos];
-			const currPlayer = currRow[pos];
-
-			if (prevPlayer !== currPlayer) {
-				// Determine where currPlayer was in the previous phase
-				const prevIndex = prevRow.indexOf(currPlayer);
-
-				if (prevIndex === 0 || prevIndex >= outfieldEnd) {
-					// From goalie or sub
-					if (contributionCount < contribution.length) {
-						phasePenalty += contribution[contributionCount];
-					}
-					contributionCount++;
-				} else {
-					// From another outfield position → bad switch
-					phasePenalty += 1;
-				}
+			if (prevRow[pos] !== currRow[pos]) {
+				swapCount++;
 			}
 		}
 
-		penalty += phasePenalty;
+		const deviation = Math.abs(swapCount - idealSwaps);
+		penalty += deviation * deviation; // Quadratic penalty
 	}
-
+	//console.log(idealSwaps, penalty);
 	return penalty;
 }
 
 
+
 // Rule 3: Penalize streaks in outfield positions that are not exactly 2 phases long
-function ruleOutfieldConsistency(state) {
+function ruleOutfieldBlockConsistency(state, ideallength = 2) {
 	let penalty = 0;
-	let swapCount=1;
 
 	for (let pos = outfieldStart; pos < outfieldEnd; pos++) {
 		let streak = 1;
@@ -139,18 +135,16 @@ function ruleOutfieldConsistency(state) {
 			const prev = state[phase - 1][pos];
 			const curr = state[phase][pos];
 
-			if (prev === curr) {
+			if (curr === prev) {
 				streak++;
-				swapCount=1;
 			} else {
-
-				penalty += swapCount * Math.abs(streak - 2);
-				swapCount += 2;
+				penalty += Math.abs(streak - ideallength); // ideal streak is 2
 				streak = 1;
 			}
 		}
-		// Handle end of streak at final phase
-		penalty += Math.abs(streak - 2);
+
+		// End-of-state handling
+		penalty += Math.abs(streak - ideallength);
 	}
 
 	return penalty;
@@ -256,5 +250,52 @@ function ruleSubFairness(state) {
 	const counts = Object.values(subCounts);
 	const spread = Math.max(...counts) - Math.min(...counts);
 	return spread;
+}
+
+function rulePositionPreferenceMatch(state) {
+	let score = 0;
+	for (let phase = 0; phase < state.length; phase++) {
+		for (let pos = 0; pos < basePositions.length; pos++) {
+			const player = state[phase][pos];
+			if (preferences[player] && preferences[player][basePositions[pos]] !== undefined) {
+				score += preferences[player][basePositions[pos]];
+			}
+		}
+	}
+	return -score; // more preference match = better = lower fitness
+}
+
+// Avoid players switching positions mid period
+function ruleInPeriodOutfieldPositionSwitch(state) {
+	const totalPhases = state.length;
+	const phasesPerPeriod = Math.floor(totalPhases / 3);
+	let penalty = 0;
+
+	for (let phase = 1; phase < totalPhases; phase++) {
+		const isPeriodBoundary = phase % phasesPerPeriod === 0;
+		if (isPeriodBoundary) continue;
+
+		const prevRow = state[phase - 1];
+		const currRow = state[phase];
+
+		// For each player in the current phase
+		for (let i = outfieldStart; i < outfieldEnd; i++) {
+			const player = currRow[i];
+
+			// Find previous position (if any)
+			const prevPos = prevRow.indexOf(player);
+
+			// If player existed in prev and has changed outfield position → penalize
+			if (
+				prevPos >= outfieldStart &&
+				prevPos < outfieldEnd && // must have been in outfield
+				prevPos !== i            // changed outfield position
+			) {
+				penalty++;
+			}
+		}
+	}
+
+	return penalty;
 }
 

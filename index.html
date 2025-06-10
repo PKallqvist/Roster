@@ -9,33 +9,47 @@
 
 <body>
 	<h1>Roster Creator [Simulated Annealing]</h1>
-	<label for="playerInput">Player Names (One name per row):</label><br>
-	<textarea id="playerInput" rows="7" cols="60" oninput="updatePlayers()">Alice
-Bob
-Charlie
-Diana
-Eve
-Frank
-Grace
-Henry</textarea>
+	<div class="player-container">
+
+	<table class="preference-table">
+  <thead>
+    <tr>
+      <th>Player</th><th>G</th><th>D</th><th>LW</th><th>RW</th><th>F</th><th></th>
+    </tr>
+  </thead>
+  <tbody id="preferenceGrid"></tbody>
+</table>
+	
 	<br>
 	<label for="phasesPerPeriod">Substitution opportunities per period:</label>
 	<select id="phasesPerPeriod" onchange="updatePhases()">
-		<option value="2" selected>1 (2 phases)</option>
-		<option value="3">2 (3 phases)</option>
+		<option value="2">1 (2 phases)</option>
+		<option value="3" selected>2 (3 phases)</option>
 	</select>
 	<br><br>
 	<button onclick="runSA()">Generate Schedule</button>
 	<button onclick="continueOptimize()">Continue Optimize</button>
 	<button onclick="randomizePlayers()">Randomize Players</button>
-	<button onclick="window.print()">Print Schedule</button>
+	
+
 
 	<div id="output" style="display: none;"></div>
 	<div id="score"></div>
-	<div id="namedGrid"></div>
-	
+	<div id="phaseSchedule"></div>
+	<button id="editButton" onclick="toggleEditMode()">Edit Schedule</button>
+
+	<button onclick="toggleView()">Toggle View</button>
+	<button onclick="window.print()">Print Schedule</button>
+	<div id="print-area-grid"></div>   <!-- Your existing layout -->
+	<div class="visual-periods-wrapper" id="print-area-visual" style="display:none;"></div>  <!-- New view -->
+
+	<div id="periodLayout"></div>
+		
 	<script type="module">
-		import { fitness2 } from './fitness2.js';
+		import { fitness2, 
+			setPlayerPreferences,
+			setPlayers 
+		} from './fitness2.js';
 		import {
 			getDefenderIcon,
 			getLeftWingIcon,
@@ -44,19 +58,194 @@ Henry</textarea>
 			getSwapIcon,
 			getGlovesIcon
 		} from './icons.js';	
+		
 
 		let players = [];
+		let playerPreferences = {};
 		const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
 		let nrSubs = 0;
 		let subs = [];
 		let positions = [];
 
-		let phasesPerPeriod = 2;
+		let phasesPerPeriod = 3;
 		let phases = phasesPerPeriod * 3;
 		let currentSchedule = null;
 
 		function isSubPosition(pos) {
 			return pos.startsWith("SUB");
+		}
+
+		function savePlayerNames() {
+			document.querySelectorAll('.player-name').forEach(input => {
+				const index = input.dataset.index;
+				const oldName = players[index];
+				const newName = input.value;
+
+				if (oldName !== newName) {
+					if (players.includes(newName)) {
+						alert("Players must use unique names.");
+						input.value = oldName;
+						return;
+					}
+					players[index] = newName;
+					playerPreferences[newName] = playerPreferences[oldName] || {};
+					delete playerPreferences[oldName];
+				} else {
+					players[index] = newName;
+				}
+			});
+		}
+
+		document.addEventListener('keydown', function (e) {
+			if (!e.target.classList.contains('player-name')) return;
+
+			const inputs = Array.from(document.querySelectorAll('.player-name'));
+			const index = inputs.indexOf(e.target);
+
+			if (e.key === 'ArrowDown' && index < inputs.length - 1) {
+				e.preventDefault();
+				inputs[index + 1].focus();
+				inputs[index + 1].select();
+			} else if (e.key === 'ArrowUp' && index > 0) {
+				e.preventDefault();
+				inputs[index - 1].focus();
+				inputs[index - 1].select();
+			}
+		});
+
+		function saveSinglePlayerName(e) {
+			const input = e.target;
+			const index = input.dataset.index;
+			const oldName = players[index];
+			const newName = input.value.trim();
+
+			if (!newName || oldName === newName) return;
+
+			if (players.includes(newName)) {
+				alert("Players must use unique names.");
+				input.value = oldName;
+				return;
+			}
+
+			players[index] = newName;
+			playerPreferences[newName] = playerPreferences[oldName] || {};
+			delete playerPreferences[oldName];
+			renderPlayerPreferenceTable(); // re-render to update name refs
+		}
+
+		function renderPlayerPreferenceTable(focusIndex = null) {
+			const tableBody = document.getElementById("preferenceGrid");
+			tableBody.innerHTML = '';
+
+			players.forEach((player, index) => {
+				const prefs = playerPreferences[player] || {};
+				let row = `<tr><td><input value="${player}" class="preference-name-input player-name" data-index="${index}" /></td>`;
+
+				basePositions.forEach(pos => {
+					const val = prefs[pos] ?? 0;
+					row += `<td><input type="number" class="preference-input" value="${val}" data-player="${player}" data-pos="${pos}" onchange="updatePreference(this)" /></td>`;
+				});
+
+				row += `<td><button onclick="removePlayer(${index})">-</button></td></tr>`;
+				tableBody.innerHTML += row;
+			});
+
+			const totalCols = basePositions.length + 2;
+			const addRow = `<tr><td colspan="${totalCols}" style="text-align: center;">
+				<button onclick="addPlayer()">+</button>
+			</td></tr>`;
+			tableBody.innerHTML += addRow;
+
+			setTimeout(() => {
+				const inputs = Array.from(document.querySelectorAll('.player-name'));
+				inputs.forEach((input, index) => {
+					input.addEventListener('blur', e => {
+						const newName = input.value.trim();
+						const oldName = players[index];
+
+						if (newName && newName !== oldName) {
+							if (players.includes(newName)) {
+								alert("Players must use unique names.");
+								input.value = oldName;
+								return;
+							}
+							players[index] = newName;
+							playerPreferences[newName] = playerPreferences[oldName] || {};
+							delete playerPreferences[oldName];
+							renderPlayerPreferenceTable(focusIndex); // re-render and restore focus
+						}
+					});
+
+					input.addEventListener('keydown', e => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							const targetIndex = index + 1;
+							input.blur(); // triggers re-render (if needed)
+							setTimeout(() => {
+								if (targetIndex >= players.length) {
+									addPlayer(); // triggers render and auto-focus
+								} else {
+									renderPlayerPreferenceTable(targetIndex); // re-render and focus next
+								}
+							}, 0);
+						}
+					});
+				});
+
+				// Focus a specific input if requested
+				if (focusIndex !== null) {
+					const target = document.querySelector(`.player-name[data-index="${focusIndex}"]`);
+					if (target) {
+						target.focus();
+						target.select();
+					}
+				}
+			}, 0);
+		}
+
+
+
+
+
+		window.addPlayer = function () {
+			savePlayerNames();
+			players.push('New Player');
+			playerPreferences['New Player'] = {};
+			renderPlayerPreferenceTable();
+
+			setTimeout(() => {
+				const inputs = document.querySelectorAll('.player-name');
+				const newInput = inputs[inputs.length - 1];
+				if (newInput) {
+					newInput.focus();
+					newInput.select();
+				}
+			}, 0);
+		};
+
+		window.removePlayer = function(index) {
+
+			const removed = players.splice(index, 1)[0];
+			delete playerPreferences[removed];
+			renderPlayerPreferenceTable();
+		}
+
+
+		function collectPlayerPreferences() {
+			playerPreferences = {}; // reset
+			const inputs = document.querySelectorAll('#preferenceGrid input');
+			inputs.forEach(input => {
+				const player = input.dataset.player;
+				const pos = input.dataset.pos;
+				const value = parseInt(input.value, 10) || 0;
+				if (!playerPreferences[player]) {
+				playerPreferences[player] = {};
+				}				
+				playerPreferences[player][pos] = value;
+			});		
+			if (typeof setPlayerPreferences === 'function') {
+				setPlayerPreferences(playerPreferences);
+			}
 		}
 
 		const positionSymbols = {
@@ -75,48 +264,131 @@ Henry</textarea>
 		const rootStyles = getComputedStyle(document.documentElement);
 
 		const positionColors = {
-		G:   rootStyles.getPropertyValue('--color-g').trim(),
-		D:   rootStyles.getPropertyValue('--color-d').trim(),
-		LW:  rootStyles.getPropertyValue('--color-lw').trim(),
-		RW:  rootStyles.getPropertyValue('--color-rw').trim(),
-		F:   rootStyles.getPropertyValue('--color-f').trim(),
-		SUB: rootStyles.getPropertyValue('--color-sub').trim()
+			G:   rootStyles.getPropertyValue('--color-g').trim(),
+			D:   rootStyles.getPropertyValue('--color-d').trim(),
+			LW:  rootStyles.getPropertyValue('--color-lw').trim(),
+			RW:  rootStyles.getPropertyValue('--color-rw').trim(),
+			F:   rootStyles.getPropertyValue('--color-f').trim(),
+			SUB: rootStyles.getPropertyValue('--color-sub').trim()
 		};
 		let editMode = false;
 		let selectedCell = null;
 
-		
-
 		window.onload = function () {
+
+			if (players.length === 0) {
+				players = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace'];
+				players.forEach(p => playerPreferences[p] = {});
+				renderPlayerPreferenceTable();
+			}
+
+			window.renderPreferenceGrid = function () {
+				const basePositions = ['G', 'D', 'LW', 'RW', 'F'];
+				const container = document.getElementById('preferenceGrid');
+
+				if (players.length === 0) {
+					window.updatePlayers(); // fallback to textarea
+				}
+
+				let html = `<table class="basic-grid"><tr><th>Player</th>`;
+				basePositions.forEach(pos => html += `<th>${pos}</th>`);
+				html += `</tr>`;
+
+				players.forEach(player => {
+					html += `<tr><td>${player}</td>`;
+					basePositions.forEach(pos => {
+						const value = playerPreferences[player]?.[pos] ?? 0;
+						html += `<td><input type="number" value="${value}" min="-100" max="100" style="width: 40px;" data-player="${player}" data-pos="${pos}" onchange="updatePreference(this)" /></td>`;
+					});
+					html += `</tr>`;
+				});
+
+				html += `</table>`;
+				container.innerHTML = html;
+			};
+
+
+			window.updatePreference = function(input) {
+				const player = input.dataset.player;
+				const pos = input.dataset.pos;
+				const value = parseInt(input.value, 10) || 0;
+
+				if (!playerPreferences[player]) {
+					playerPreferences[player] = {};
+				}
+				playerPreferences[player][pos] = value;
+
+				if (typeof setPlayerPreferences === 'function') {
+					setPlayerPreferences(playerPreferences);
+				}
+			};
 
 
 			window.updatePhases = function () {
 				phasesPerPeriod = parseInt(document.getElementById("phasesPerPeriod").value, 10);
-				phases = phasesPerPeriod * 3;
-				//   console.log('Phases updated to:', phases);
+				phases = phasesPerPeriod * 3;			
 			}
 
 
 			window.updatePlayers = function () {
-				const input = document.getElementById("playerInput").value;
-				players = input.split(/[\n,]+/).map(p => p.trim()).filter(p => p);
+				savePlayerNames(); // capture edited names
 
 				nrSubs = players.length - 5;
 				subs = Array.from({ length: nrSubs }, (_, i) => `SUB${i + 1}`);
 				positions = basePositions.concat(subs);
+
+				if (typeof setPlayers === 'function') {
+					setPlayers(players);
+				}
 			};
 
+			function generatePerfectInitialState() {
+				const perfectStateIds_7_2 = [
+					[1, 6, 5, 2, 4, 7, 3],
+					[1, 7, 3, 2, 4, 5, 6],
+					[1, 7, 3, 5, 6, 4, 2],
+					[2, 3, 4, 5, 6, 7, 1],
+					[2, 3, 4, 1, 7, 5, 6],
+					[2, 5, 6, 1, 7, 4, 3],
+					[3, 5, 6, 4, 2, 7, 1],
+					[3, 1, 7, 4, 2, 6, 5],
+					[3, 1, 7, 6, 5, 2, 4]
+				];
+				const perfectStateIds_6_2 = [
+					[1, 2, 4, 5, 3, 6],
+					[1, 2, 6, 5, 3, 4],
+					[1, 4, 6, 5, 3, 2],
+					[2, 4, 6, 3, 1, 5],
+					[2, 4, 5, 3, 1, 6],
+					[2, 6, 5, 4, 1, 3],
+					[3, 6, 2, 4, 5, 1],
+					[3, 1, 2, 6, 5, 4],
+					[3, 1, 2, 6, 4, 5]
+				];
+
+				let perfectStateIds = players.length == 7 ? perfectStateIds_7_2 : perfectStateIds_6_2;
+
+				// Map numeric IDs to player names (assuming players[0] = 'Alice' etc.)
+				const state = perfectStateIds.map(row => row.map(id => players[id - 1]));
+
+				return state;
+			}
+
 			function generateInitialState() {
+				return generatePerfectInitialState();
 				const state = [];
 				for (let i = 0; i < phases; i++) {
 					const phasePlayers = [...players].sort(() => Math.random() - 0.5);
 					state.push(phasePlayers);
 				}
+				
 				return state;
+				
+				
 			}
 
 			function applyGoalieLocks(state) {
-				// const phasesPerPeriod = subsPerPeriod; // e.g., 2 subs → 3 phases 
+				
 				for (let phase = 0; phase < state.length; phase++) {
 					const periodIndex = Math.floor(phase / phasesPerPeriod);
 					const goalie = players[periodIndex % 3]; // Cycle through first 3 goalies
@@ -126,14 +398,18 @@ Henry</textarea>
 			}
 
 			
-			window.toggleEditMode = function() {
+			window.toggleEditMode = function () {
 				editMode = !editMode;
 				selectedCell = null;
-				alert(editMode ? 'Edit mode ON' : 'Edit mode OFF');
-			}
+
+				const btn = document.getElementById("editButton");
+				if (btn) {
+					btn.classList.toggle("active-button", editMode);
+				}
+				};
 
 			function fitness(state) {
-				return fitness2(state, players, positions);				
+				return fitness2(state);				
 			}
 
 			// Helpers
@@ -153,7 +429,51 @@ Henry</textarea>
 			}
 
 
-			function getNeighbor(state) {
+			function getNeighborSwapPositions(state) {
+				const newState = JSON.parse(JSON.stringify(state));
+				const positionCount= basePositions.length-1;
+				// Pick two positions to swap
+				let i = 1 + Math.floor(Math.random() * positionCount);
+				let j = 1 + Math.floor(Math.random() * positionCount);
+
+				let p1 = Math.floor(Math.random() * (phases-1));
+				let p2 =  p1 + 1 + Math.floor(Math.random() * (phases-p1));
+				p1=0;
+				p2 = phases;
+
+				for (let phase = p1; phase < p2; phase++) {
+					const temp = newState[phase][i];
+					newState[phase][i] = newState[phase][j];
+					newState[phase][j] = temp;
+				}
+
+				return newState;
+			}
+
+			function getNeighborEnforce2Phase(state) {
+				const newState = JSON.parse(JSON.stringify(state));
+				const midPhase = Math.floor(Math.random() * (phases - 2)) + 1;
+				const pos = Math.floor(Math.random() * positions.length);
+
+				const p1 = newState[midPhase - 1][pos];
+				const p2 = newState[midPhase][pos];
+				const p3 = newState[midPhase + 1][pos];
+
+				// Only enforce 2-phase if p2 is isolated (not matching neighbors)
+				if (p1 !== p2 && p2 !== p3) {
+					const currentIdx = newState[midPhase + 1].indexOf(p2);
+					const swapWith = newState[midPhase + 1][pos];
+
+					// Swap to extend p2's stay in the same position
+					newState[midPhase + 1][currentIdx] = swapWith;
+					newState[midPhase + 1][pos] = p2;
+				}
+
+				return newState;
+			}
+
+
+			function getNeighborRandom(state) {
 				const newState = JSON.parse(JSON.stringify(state));
 				const phase = Math.floor(Math.random() * phases);
 				let i = Math.floor(Math.random() * players.length);
@@ -165,14 +485,64 @@ Henry</textarea>
 				[newState[phase][i], newState[phase][j]] = [newState[phase][j], newState[phase][i]];
 				return newState;
 			}
+			function getNeighborSwitchPlayerPositions(state) {
+				const newState = JSON.parse(JSON.stringify(state)); // Deep copy
+
+				// Pick playerA from the full range
+				const indexA = Math.floor(Math.random() * players.length);
+				const playerA = players[indexA];
+
+				// Determine group: goalies (0-2) or field (3+)
+				const groupStart = indexA <= 2 ? 0 : 3;
+				const groupEnd = indexA <= 2 ? 3 : players.length;
+
+				// Pick playerB from the same group, excluding playerA
+				let indexB;
+				do {
+					indexB = groupStart + Math.floor(Math.random() * (groupEnd - groupStart));
+				} while (indexB === indexA);
+
+				const playerB = players[indexB];
+
+				// Swap their positions in each phase
+				for (let phase = 0; phase < newState.length; phase++) {
+					const idxA = newState[phase].indexOf(playerA);
+					const idxB = newState[phase].indexOf(playerB);
+
+					if (idxA !== -1 && idxB !== -1) {
+						[newState[phase][idxA], newState[phase][idxB]] = [newState[phase][idxB], newState[phase][idxA]];
+					}
+				}
+
+				return newState;
+			}
+
+
+
+			function getNeighbor(state) {
+				const r = Math.random();
+
+				// original:
+				if (r < 0.5) return getNeighborRandom(state);               // player swap in a phase				
+				if (r < 0.8) return getNeighborSwapPositions(state);        // position-role swap
+				return getNeighborEnforce2Phase(state);                     // 2-phase run enforcement
+
+				// perfect 3 phase -> 2 subs 
+				if (r < 0.5) return getNeighborSwitchPlayerPositions(state);
+				return getNeighborSwapPositions(state);        // position-role swap
+			}
+
+			
 
 			function optimizeSchedule(initialState, iterations = 5000, temp = 1000, alpha = 0.98) {
 				//updateWeightsFromInputs();
 				let current = initialState;
 				applyGoalieLocks(current);
-				let best = JSON.parse(JSON.stringify(current));
-				let bestScore = fitness(current);
+				let best = JSON.parse(JSON.stringify(current)) ;
+				
+				let bestScore = fitness(current) + 0.001;
 				let T = temp;
+
 				while (T > 1e-3 && iterations-- > 0) {
 					const neighbor = getNeighbor(current);
 					applyGoalieLocks(neighbor);
@@ -187,12 +557,14 @@ Henry</textarea>
 					}
 					T *= alpha;
 				}
+				
 				return best;
 			}
 
 
 			function renderSchedule(schedule) {
-				document.getElementById('namedGrid').innerHTML = ''; // clear before adding new content
+				// Clear the relevant containers
+				document.getElementById('phaseSchedule').innerHTML = '';
 
 				const phaseColors = Array(phases).fill(null).map(() => Array(positions.length).fill(''));
 
@@ -234,12 +606,14 @@ Henry</textarea>
 
 				renderPlayerPositionGrid(currentSchedule);
 				
-				let nameGrid = '<h3>Schedule by Phase</h3><table class="basic-grid"><tr><th>Phase</th>' +
-					positions.map(p => {
+				let nameGrid = '<h3>Schedule by Phase</h3><table class="basic-grid"><tr><td>Phase</td>' +
+					positions.map((p, i) => {
 						const role = isSubPosition(p) ? 'sub' : p.toLowerCase();
-						return `<th class="position-header next-${role}">${p}</th>`;
+						return `<td class="position-header next-${role} clickable" onclick="handleCellClick(this, -1, ${i})">${p}</td>`;
 					}).join('') +
 					'</tr>';
+
+
 
 				schedule.forEach((phase, i) => {
 					nameGrid += `<tr><td>${i + 1}</td>`;
@@ -258,44 +632,94 @@ Henry</textarea>
 					nameGrid += '</tr>';
 				});
 				nameGrid += '</table>';
-				nameGrid += '<button onclick="toggleEditMode()">Edit Schedule</button>';
-
-				document.getElementById('namedGrid').innerHTML = nameGrid;
-
+				
 				const score = fitness(schedule);
-				//    console.log(schedule);
+				
 				document.getElementById('score').innerHTML = `<p>Score: ${score}</p>`;
 
+				document.getElementById('phaseSchedule').innerHTML = nameGrid;						
+
 				renderAllPeriods(schedule);
+				renderVisualSubView(schedule);
 
 			}
 
-			window.handleCellClick =  function (cell, phaseIndex, playerIndex) {
-				if (!editMode) return;
+			// window.handleCellClick =  function (cell, phaseIndex, playerIndex) {
+			// 	if (!editMode) return;
 
+			// 	if (selectedCell) {
+			// 		if (selectedCell.phase === phaseIndex) {
+			// 		// swap players
+			// 		const tmp = currentSchedule[phaseIndex][selectedCell.index];
+			// 		currentSchedule[phaseIndex][selectedCell.index] = currentSchedule[phaseIndex][playerIndex];
+			// 		currentSchedule[phaseIndex][playerIndex] = tmp;
+
+			// 		selectedCell = null;
+			// 		renderSchedule(currentSchedule); // re-render all
+			// 		} else {
+			// 		alert("Swap must be within the same phase.");
+			// 		selectedCell = null;
+			// 		}
+			// 	} else {
+			// 		selectedCell = { cell, phase: phaseIndex, index: playerIndex };
+			// 		cell.style.border = '2px solid red';
+			// 	}
+			// 	}
+
+			window.handleCellClick = function (cell, phaseIndex, playerIndex) {
+				if (!editMode) return;
+				
+				if (phaseIndex === -1) {
+					// Header clicked for column selection
+					if (selectedCell && selectedCell.phase === -1) {
+						// Second column selected → swap columns
+						const col1 = selectedCell.index;
+						const col2 = playerIndex;
+
+						for (let i = 0; i < currentSchedule.length; i++) {
+							[currentSchedule[i][col1], currentSchedule[i][col2]] =
+								[currentSchedule[i][col2], currentSchedule[i][col1]];
+						}
+
+						selectedCell.cell.style.border = '';
+						selectedCell = null;
+						renderSchedule(currentSchedule);
+					} else {
+						// First column selected
+						if (selectedCell) selectedCell.cell.style.border = ''; // clear previous
+						selectedCell = { cell, phase: -1, index: playerIndex };
+						cell.style.border = '2px solid red';
+					}
+					return;
+				}
+
+				// Regular in-phase cell selection and swap
 				if (selectedCell) {
 					if (selectedCell.phase === phaseIndex) {
-					// swap players
-					const tmp = currentSchedule[phaseIndex][selectedCell.index];
-					currentSchedule[phaseIndex][selectedCell.index] = currentSchedule[phaseIndex][playerIndex];
-					currentSchedule[phaseIndex][playerIndex] = tmp;
+						// swap players
+						const tmp = currentSchedule[phaseIndex][selectedCell.index];
+						currentSchedule[phaseIndex][selectedCell.index] = currentSchedule[phaseIndex][playerIndex];
+						currentSchedule[phaseIndex][playerIndex] = tmp;
 
-					selectedCell = null;
-					renderSchedule(currentSchedule); // re-render all
+						selectedCell.cell.style.border = '';
+						selectedCell = null;
+						renderSchedule(currentSchedule);
 					} else {
-					alert("Swap must be within the same phase.");
-					selectedCell = null;
+						alert("Swap must be within the same phase.");
+						selectedCell.cell.style.border = '';
+						selectedCell = null;
 					}
 				} else {
 					selectedCell = { cell, phase: phaseIndex, index: playerIndex };
 					cell.style.border = '2px solid red';
 				}
-				}
-
+			};
 
 
 			window.runSA = function () {
+
 				updatePlayers();
+				collectPlayerPreferences();
 				currentSchedule = optimizeSchedule(generateInitialState());
 				renderSchedule(currentSchedule);
 			}
@@ -326,17 +750,45 @@ Henry</textarea>
 
 			window.continueOptimize = function () {
 				updatePlayers();
+				collectPlayerPreferences();
 				if (currentSchedule) {
-					for (let i = 0; i < 100; i++) {
+					for (let i = 0; i < 10; i++) {
 						currentSchedule = optimizeSchedule(currentSchedule);
 					}
 					renderSchedule(currentSchedule);
 				}
 			}
 		}
+		function getSymbolForPosition(pos) {
+			const normalized = pos.startsWith('SUB') ? 'SUB' : pos;
+			const color = positionColors[normalized] || '#000';
+			
+			switch (normalized) {
+				case 'G':
+					return getGlovesIcon(color);
+				case 'SUB':
+					return getSwapIcon(color);
+				case 'LW':
+					return getLeftWingIcon(color);
+				case 'RW':
+					return getRightWingIcon(color);
+				case 'D':
+					return getDefenderIcon(color);
+				case 'F':
+					return getStrikerIcon(color);
+				default:
+					return positionSymbols[normalized] || '';
+			}
+		}
+
 
 		function renderAllPeriods(schedule) {
-			const container = document.getElementById('namedGrid');
+			// document.getElementById('periodLayout').innerHTML = '';	
+			// const container = document.getElementById('periodLayout');
+
+			document.getElementById("print-area-grid").innerHTML = '';
+			const container = document.getElementById("print-area-grid");
+
 			const totalPeriods = phases / phasesPerPeriod;
 
 			const dividerHeight = phasesPerPeriod === 2 ? '8px' : '0px';
@@ -358,7 +810,8 @@ Henry</textarea>
 				layout.push(newRow);
 			}
 
-			let fullHTML = `<h2>Period Layout Grids</h2><div id="print-area"><table class="period-grid">`;
+			//let fullHTML = `<h2>Period Layout Grids</h2><div id="print-area"><table class="period-grid">`;
+			let fullHTML = `<h2 class="no-print">Period Layout Grids</h2><div id="print-area"><table class="period-grid">`;
 
 			for (let p = 0; p < totalPeriods; p++) {
 				const start = p * phasesPerPeriod;
@@ -369,7 +822,8 @@ Henry</textarea>
 				layout.forEach((row, rowIndex) => {
 				fullHTML += '<tr>';
 				if (rowIndex === 0) {
-					fullHTML += `<td class="period-label divider" rowspan="${layout.length}">${label}</td>`;
+					fullHTML += `<td class="no-border period-label divider " rowspan="${layout.length}">${label}</td>`;
+					fullHTML += `<td class="no-border " rowspan="${layout.length}"></td>`;
 				}
 
 				row.forEach(pos => {
@@ -391,31 +845,9 @@ Henry</textarea>
 						const symbolKey = isSubPosition(nextPos) ? 'SUB' : nextPos;
 
 						const color = positionColors[symbolKey] || '#000';
-
-						switch (symbolKey) {
-							case 'G':
-							// nextSymbol = `<img src="gloves.svg" alt="G" style="width: 22px; height: auto;" />`;
-							nextSymbol = getGlovesIcon(color);
-							break;
-							case 'SUB':
-							nextSymbol = getSwapIcon(color);
-							break;
-							case 'LW':
-							nextSymbol = getLeftWingIcon(color);
-							break;
-							case 'RW':
-							nextSymbol = getRightWingIcon(color);
-							break;
-							case 'D':
-							nextSymbol = getDefenderIcon(color);
-							break;
-							case 'F':
-							nextSymbol = getStrikerIcon(color);
-							break;
-							default:
-							nextSymbol = positionSymbols[symbolKey] || '';
-						}
-
+						
+						nextSymbol = getSymbolForPosition(symbolKey);
+						
 						nextColor = positionColors[symbolKey] || '#000';
 						}
 
@@ -436,23 +868,141 @@ Henry</textarea>
 				fullHTML += '</tr>';
 				});
 				if (p < totalPeriods - 1) {
-					fullHTML += `<tr class="period-spacer"><td colspan="${layout[0].length + 1}"></td></tr>
-								 <tr class="period-divider"><td colspan="${layout[0].length + 1}"></td></tr>`;
+					fullHTML += `<tr class="period-spacer"><td colspan="${layout[0].length + 2}"></td></tr>
+								 <tr class="period-divider"><td colspan="${layout[0].length + 2}"></td></tr>`;
 					
 				}
 			}
 
 			fullHTML += '</table></div>';
 			container.insertAdjacentHTML('beforeend', fullHTML);
+		}				
+
+		window.toggleView = function () {
+			const grid = document.getElementById("print-area-grid");
+			const visual = document.getElementById("print-area-visual");
+
+			const showVisual = grid.style.display !== "none";
+
+			if (showVisual) {
+				grid.style.display = "none";
+				visual.style.display = "block";
+			} else {
+				grid.style.display = "block";
+				visual.style.display = "none";
+			}
+		};
+
+
+
+
+		function getSubstitutionMarkup(schedule, start, end) {
+			const posList = ['G', 'D', 'LW', 'RW', 'F'];
+			const subList = positions.filter(p => p.startsWith('SUB'));
+
+			const allKeys = [...posList, ...subList];
+			const rows = Object.fromEntries(allKeys.map(p => [p, '']));
+
+			// Only render G initially
+			const goalieIdx = positions.indexOf('G');
+			const goalie = schedule[start][goalieIdx];
+			rows['G'] += `<div><strong>${goalie}</strong></div>`;
+
+			// Track current phase changes
+			for (let phase = start + 1; phase < end; phase++) {
+				const isGreen = phase === start + 1;
+				const cssClass = isGreen ? 'sub1' : 'sub2';
+
+				for (const pos of posList) {
+					const idx = positions.indexOf(pos);
+					const prev = schedule[phase - 1][idx];
+					const curr = schedule[phase][idx];
+
+					if (prev !== curr) {
+						// Field player swap
+						let nextSymbol = getSymbolForPosition(pos);
+						rows[pos] += `<div class="${cssClass}"><strong>${prev}</strong> / ${curr}</div>`;
+						if (phase === start +1) {  // green swap
+							rows['SUB1'] += `<div class="${cssClass} sub-line"><span class="symbol">${nextSymbol}</span><span><strong>${curr}</strong> / ${prev}</span></div>`;
+
+						} else { //Blue swap
+							rows['SUB2'] += `<div class="${cssClass} sub-line"><span class="symbol">${nextSymbol}</span><span><strong>${curr}</strong> / ${prev}</span></div>`;
+
+						}
+					} else if (pos != 'G') { //(phase == start +1 ) {
+						
+						rows[pos] += `<div><strong>${prev}</strong></div>`;
+					}
+				}
+			}
+
+			return rows;
 		}
-		
+
+
+
+function renderVisualSubView(schedule) {
+	const container = document.getElementById('print-area-visual');
+	container.innerHTML = ''; // Clear previous
+
+	const totalPeriods = phases / phasesPerPeriod;
+
+	for (let p = 0; p < totalPeriods; p++) {
+		const start = p * phasesPerPeriod;
+		const end = start + phasesPerPeriod;
+
+		const rows = getSubstitutionMarkup(schedule, start, end);
+
+		const periodDiv = document.createElement('div');
+		periodDiv.className = 'visual-period';
+
+		const table = document.createElement('table');
+		table.className = 'visual-table';
+
+		table.innerHTML = `
+			<tr><td colspan="4" style="font-weight: bold; text-align: left; padding: 4px;">Period ${p + 1}</td></tr>
+			<tr>
+				<td><div class="cell-content"></div></td>
+				<td class="visual-cell border-f">${rows['F']}</td>		
+				<td></td>		
+				
+				<td class="visual-cell border-sub" rowspan="2">${rows['SUB1']}</td>
+			</tr>
+			<tr>
+				<td class="visual-cell border-lw">${rows['LW']}</td>
+				<td><div class="cell-content"></div></td>
+				<td class="visual-cell border-rw">${rows['RW']}</td>
+			</tr>
+			<tr>
+				<td><div class="cell-content"></div></td>
+				<td class="visual-cell border-d">${rows['D']}</td>
+				<td></td>
+				<td rowspan="2" class="visual-cell border-sub ">${rows['SUB2']}</td>
+			</tr>
+			<tr>
+				<td><div class="cell-content"></div></td>
+				<td class="visual-cell border-g ">${rows['G']}</td>
+				<td></td>				
+			</tr>
+		`;
+
+		periodDiv.appendChild(table);
+		container.appendChild(periodDiv);
+	}
+}
+
+
+
+
+
+
 
 		function renderPlayerPositionGrid(state) {
 			const grid = getPlayerPositionGrid(state);
 			const positions = [...basePositions, 'SUB'];
 
 			let html = '<h3>Player Position Counts</h3><table class="basic-grid" border="1" cellpadding="5" cellspacing="0"><tr><th>Player</th>';
-
+			
 			for (const pos of positions) {
 				html += `<th>${pos}</th>`;
 			}
@@ -475,7 +1025,7 @@ Henry</textarea>
 		function getPlayerPositionGrid(state) {
 			const grid = {};
 			const allPositions = [...basePositions, 'SUB'];
-
+			// console.log(allPositions);
 			// Initialize empty grid
 			for (const player of players) {
 				grid[player] = {};
@@ -483,13 +1033,21 @@ Henry</textarea>
 					grid[player][pos] = 0;
 				}
 			}
+			// console.log(players);
+			// console.log(positions);
 
 			// Fill counts
 			for (let phase = 0; phase < phases; phase++) {
 				for (let pos = 0; pos < positions.length; pos++) {
 					const player = state[phase][pos];
 					const positionName = isSubPosition(positions[pos]) ? 'SUB' : positions[pos];
-					grid[player][positionName]++;
+					try {
+						grid[player][positionName]++;
+					}
+					catch {
+						console.log('failed player:', player);
+						console.log('failed position:', positionName);
+					}
 				}
 			}
 
