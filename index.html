@@ -56,7 +56,8 @@
 			getRightWingIcon,
 			getStrikerIcon,
 			getSwapIcon,
-			getGlovesIcon
+			getGlovesIcon,
+			getDiamondIcon
 		} from './icons.js';	
 		
 
@@ -271,6 +272,14 @@
 			F:   rootStyles.getPropertyValue('--color-f').trim(),
 			SUB: rootStyles.getPropertyValue('--color-sub').trim()
 		};
+			// 	const positionColors = {
+			// G:   rootStyles.getPropertyValue('--color-sub').trim(),
+			// D:   rootStyles.getPropertyValue('--color-sub').trim(),
+			// LW:  rootStyles.getPropertyValue('--color-sub').trim(),
+			// RW:  rootStyles.getPropertyValue('--color-sub').trim(),
+			// F:   rootStyles.getPropertyValue('--color-sub').trim(),
+			// SUB: rootStyles.getPropertyValue('--color-sub').trim()
+		//};
 		let editMode = false;
 		let selectedCell = null;
 
@@ -523,9 +532,9 @@
 				const r = Math.random();
 
 				// original:
-				if (r < 0.5) return getNeighborRandom(state);               // player swap in a phase				
-				if (r < 0.8) return getNeighborSwapPositions(state);        // position-role swap
-				return getNeighborEnforce2Phase(state);                     // 2-phase run enforcement
+				// if (r < 0.5) return getNeighborRandom(state);               // player swap in a phase				
+				// if (r < 0.8) return getNeighborSwapPositions(state);        // position-role swap
+				// return getNeighborEnforce2Phase(state);                     // 2-phase run enforcement
 
 				// perfect 3 phase -> 2 subs 
 				if (r < 0.5) return getNeighborSwitchPlayerPositions(state);
@@ -759,25 +768,39 @@
 				}
 			}
 		}
-		function getSymbolForPosition(pos) {
-			const normalized = pos.startsWith('SUB') ? 'SUB' : pos;
+		
+		function getSymbolForPosition(pos, size=22) {
+			const normalized = pos.startsWith('SUB') ? 'SUB' : pos;			
 			const color = positionColors[normalized] || '#000';
 			
+			// switch (normalized) {
+			// 	case 'G':
+			// 		return getGlovesIcon(color, size);
+			// 	case 'SUB':
+			// 		return getSwapIcon(color, size);
+			// 	case 'LW':
+			// 		return getLeftWingIcon(color, size);
+			// 	case 'RW':
+			// 		return getRightWingIcon(color, size);
+			// 	case 'D':
+			// 		return getDefenderIcon(color, size);
+			// 	case 'F':
+			// 		return getStrikerIcon(color, size);
+			// 	default:
+			// 		return positionSymbols[normalized] || '';
+			// }
 			switch (normalized) {
 				case 'G':
-					return getGlovesIcon(color);
+				return getGlovesIcon(color, size);
 				case 'SUB':
-					return getSwapIcon(color);
+				return getSwapIcon(color, size);
 				case 'LW':
-					return getLeftWingIcon(color);
 				case 'RW':
-					return getRightWingIcon(color);
 				case 'D':
-					return getDefenderIcon(color);
 				case 'F':
-					return getStrikerIcon(color);
+				return getDiamondIcon(normalized, color, size);
 				default:
-					return positionSymbols[normalized] || '';
+				return positionSymbols[normalized] || '';
 			}
 		}
 
@@ -896,103 +919,221 @@
 
 
 
-		function getSubstitutionMarkup(schedule, start, end) {
-			const posList = ['G', 'D', 'LW', 'RW', 'F'];
-			const subList = positions.filter(p => p.startsWith('SUB'));
 
-			const allKeys = [...posList, ...subList];
-			const rows = Object.fromEntries(allKeys.map(p => [p, '']));
 
-			// Only render G initially
-			const goalieIdx = positions.indexOf('G');
-			const goalie = schedule[start][goalieIdx];
-			rows['G'] += `<div><strong>${goalie}</strong></div>`;
+function getColorForPosition(pos) {
+  const normalized = pos.startsWith('SUB') ? 'SUB' : pos;
+  return positionColors[normalized] || '#000';
+}
+function normalizePos(p) {
+  return p.startsWith('SUB') ? 'SUB' : p;
+}
 
-			// Track current phase changes
-			for (let phase = start + 1; phase < end; phase++) {
-				const isGreen = phase === start + 1;
-				const cssClass = isGreen ? 'sub1' : 'sub2';
+function getSubstitutionMarkup(schedule, start, end) {
+  const posList = ['G', 'D', 'LW', 'RW', 'F'];
+  const subList = positions.filter(p => p.startsWith('SUB'));
+  const allKeys = [...posList, ...subList, 'SUB1', 'SUB2', 'INLINE'];
+  const rows = Object.fromEntries(allKeys.map(p => [p, '']));
 
-				for (const pos of posList) {
-					const idx = positions.indexOf(pos);
-					const prev = schedule[phase - 1][idx];
-					const curr = schedule[phase][idx];
+  // Initial goalie
+  const goalieIdx = positions.indexOf('G');
+//   const goalieSymbol = getSymbolForPosition('G', 128);
+//   const svgEncoded = encodeURIComponent(goalieSymbol).replace(/'/g, "%27").replace(/"/g, "%22");
+//   const bgStyle = `background-image: url(\"data:image/svg+xml,${svgEncoded}\"); background-repeat: no-repeat; background-size: 128px 128px; padding-left: 72px; min-height: 128px; display: flex; align-items: center;`;
+//   rows['G'] = `<div style='${bgStyle}'><strong>${schedule[start][goalieIdx]}</strong></div>`;
+ const goalieName = schedule[start][goalieIdx];
+const colorMap = {
+  '--glove-palm': '#fbbb30',
+  '--glove-wrist-and-ball': '#9a1f32',
+  '--glove-detail': '#9e9798',
+  '--contour': '#210e0f'
+};
 
-					if (prev !== curr) {
-						// Field player swap
-						let nextSymbol = getSymbolForPosition(pos);
-						rows[pos] += `<div class="${cssClass}"><strong>${prev}</strong> / ${curr}</div>`;
-						if (phase === start +1) {  // green swap
-							rows['SUB1'] += `<div class="${cssClass} sub-line"><span class="symbol">${nextSymbol}</span><span><strong>${curr}</strong> / ${prev}</span></div>`;
+let rawSvg = getSymbolForPosition('G', 64);
 
-						} else { //Blue swap
-							rows['SUB2'] += `<div class="${cssClass} sub-line"><span class="symbol">${nextSymbol}</span><span><strong>${curr}</strong> / ${prev}</span></div>`;
+// Replace all CSS vars with hex codes
+Object.entries(colorMap).forEach(([variable, hex]) => {
+  rawSvg = rawSvg.replaceAll(`var(${variable})`, hex);
+});
 
-						}
-					} else if (pos != 'G') { //(phase == start +1 ) {
+// Now encode and embed
+const svgEncoded = encodeURIComponent(rawSvg)
+  .replace(/'/g, "%27")
+  .replace(/"/g, "%22");
+
+// const bgStyle = `
+//   background-image: url("data:image/svg+xml,${svgEncoded}");
+//   background-repeat: no-repeat;
+//   background-size: 64px 64px;
+//   background-position: center Left;
+//   padding-left: 64px;
+//   min-height: 64px;
+//   display: flex;
+//   align-items: center;
+// `;
+const bgStyle = `
+	display: flex;
+	align-items: center;
+`;
+
+
+rows['G'] = `
+  <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+    <span class="symbol">${rawSvg}</span>
+    <strong>${goalieName}</strong>
+  </div>
+`;
+// rows['G'] = `<div class = '${bgStyle}'>${rawSvg}<strong>${schedule[start][goalieIdx]}</strong></div>`;
+
+
+  //rows['G'] = `<div style='${bgStyle}'>${goalieSymbol}<br/><strong>${schedule[start][goalieIdx]}</strong><br/></div>`;
+  // helper to group subs
+  function normalizePos(p) {
+    return p.startsWith('SUB') ? 'SUB' : p;
+  }
+
+  for (let phase = start + 1; phase < end; phase++) {
+    const isFirstSwap = phase === start + 1;
+    const cssClass    = isFirstSwap ? 'sub1' : 'sub2';
+    const borderClass = isFirstSwap ? 'swap1-border' : 'swap2-border';
+    const subKey      = isFirstSwap ? 'SUB1' : 'SUB2';
+
+    for (const pos of posList) {
+      const idx  = positions.indexOf(pos);
+      const prev = schedule[phase - 1][idx];
+      const curr = schedule[phase][idx];
+
+	  
+      if (prev !== curr) { // player exchange on position
+
+		// === Check for clean swap ===
+        let c_pos = normalizePos(positions.find(p => schedule[phase - 1][positions.indexOf(p)] === curr));
+        let p_pos = normalizePos(positions.find(p => schedule[phase][positions.indexOf(p)] === prev));
+        let isCleanSwap = c_pos && p_pos && c_pos === p_pos;
+
+		const leaveMarkup = `<span class="${borderClass}" style="color: ${getColorForPosition('SUB')}"><strong>${prev}</strong></span>`;
+        const enterMarkup = `<span class="${borderClass}" style="color: ${getColorForPosition('SUB')}"><strong>${curr}</strong></span>`;
+		// const leaveMarkup = `<span class="${borderClass}" style="color: ${getColorForPosition(p_pos)}"><strong>${prev}</strong></span>`;
+        // const enterMarkup = `<span class="${borderClass}" style="color: ${getColorForPosition(pos)}"><strong>${curr}</strong></span>`;
+		
+
+        
+        if (isCleanSwap) {
+          // pure swap: show on field A / B
+          rows[pos] += `<div class="${cssClass}">${leaveMarkup}<span class = "transition"> ⇄ </span> ${enterMarkup}</div>`;
+		  
+          // sub cell: field-symbol then A / B
+		  //Substitution column, clean swaps
+          const symbol = getSymbolForPosition(pos);
+          rows[subKey] +=
+            `<div class="${cssClass} sub-line">` +
+              `<span class="symbol" >${symbol}</span>&nbsp;` +
+              `<span>${enterMarkup} <span class = "transition"> ⇄ </span> ${leaveMarkup}</span>` +
+            `</div>`;
+        } else {
+          // one-way: leave (next-pos-icon) | enter
+          // find where 'prev' went
+          const targetPos = positions.find(other => schedule[phase][positions.indexOf(other)] === prev);
+          const targetSymbol = targetPos ? getSymbolForPosition(targetPos) : '';
+		  const symbolKey = isSubPosition(targetPos) ? 'SUB' : targetPos;
+		  const targetColor = positionColors[symbolKey] || '#000';
 						
-						rows[pos] += `<div><strong>${prev}</strong></div>`;
-					}
-				}
-			}
+          rows[pos] +=
+            `<div class="${cssClass}" style="color: ${targetColor}">` +
+              `${leaveMarkup} | ${enterMarkup}` +
+            `</div>`;
 
-			return rows;
-		}
+          // sub cell one-way: same symbol for field->sub move
+		  //Substitution column, non clean swaps
+          const symbol = getSymbolForPosition(pos);
 
+		  if (symbolKey === 'SUB') {  // The switching out
 
-
-function renderVisualSubView(schedule) {
-	const container = document.getElementById('print-area-visual');
-	container.innerHTML = ''; // Clear previous
-
-	const totalPeriods = phases / phasesPerPeriod;
-
-	for (let p = 0; p < totalPeriods; p++) {
-		const start = p * phasesPerPeriod;
-		const end = start + phasesPerPeriod;
-
-		const rows = getSubstitutionMarkup(schedule, start, end);
-
-		const periodDiv = document.createElement('div');
-		periodDiv.className = 'visual-period';
-
-		const table = document.createElement('table');
-		table.className = 'visual-table';
-
-		table.innerHTML = `
-			<tr><td colspan="4" style="font-weight: bold; text-align: left; padding: 4px;">Period ${p + 1}</td></tr>
-			<tr>
-				<td><div class="cell-content"></div></td>
-				<td class="visual-cell border-f">${rows['F']}</td>		
-				<td></td>		
+				rows[subKey] +=
+				`<div class="${cssClass} sub-line">` +
+					`<span style="color: ${targetColor}">${leaveMarkup} </span>` +
+					`<span class="transition">🡲</span>` +
+					`<span class="symbol">${targetSymbol}</span>` +
+				`</div>`;
 				
-				<td class="visual-cell border-sub" rowspan="2">${rows['SUB1']}</td>
-			</tr>
-			<tr>
-				<td class="visual-cell border-lw">${rows['LW']}</td>
-				<td><div class="cell-content"></div></td>
-				<td class="visual-cell border-rw">${rows['RW']}</td>
-			</tr>
-			<tr>
-				<td><div class="cell-content"></div></td>
-				<td class="visual-cell border-d">${rows['D']}</td>
-				<td></td>
-				<td rowspan="2" class="visual-cell border-sub ">${rows['SUB2']}</td>
-			</tr>
-			<tr>
-				<td><div class="cell-content"></div></td>
-				<td class="visual-cell border-g ">${rows['G']}</td>
-				<td></td>				
-			</tr>
-		`;
+				
+		  } else {
+				//The one entering the field
+				rows[subKey] +=
+				`<div class="${cssClass} sub-line">` +
+				`<span class="symbol">${symbol}</span><span class="transition"> 🡰 </span> ${enterMarkup}</span>` +
+				`</div>`;
 
-		periodDiv.appendChild(table);
-		container.appendChild(periodDiv);
-	}
+				//The one switching position on the field
+				//rows[subKey] +=`<div class="${cssClass} sub-line dot" style="border-style: dotted; border-color: inherit; border-width: 1px;">` +
+				rows['INLINE'] +=`<div class="${cssClass} sub-line dot" >` +
+				`${leaveMarkup}</span><span class="symbol">${symbol} <span class="transition"> 🡲 </span> ${targetSymbol}</span>` +
+				`</div>`;
+
+			}
+        }
+      } else { // If it's the same player in the same pos
+	  	if  (pos != 'G') {
+			let new_val=`<div><strong>${prev}</strong></div>`;
+			if (new_val!=rows[pos]) {
+        		rows[pos] += `<div><strong>${prev}</strong></div>`;
+			}
+		}
+      }
+    }
+  }
+
+  return rows;
 }
 
 
 
+function renderVisualSubView(schedule) {
+  const container = document.getElementById('print-area-visual');
+  container.innerHTML = '';
+  const totalPeriods = phases / phasesPerPeriod;
+
+  for (let p = 0; p < totalPeriods; p++) {
+    const start = p * phasesPerPeriod;
+    const end = start + phasesPerPeriod;
+    const rows = getSubstitutionMarkup(schedule, start, end);
+
+    const periodDiv = document.createElement('div');
+    periodDiv.className = 'visual-period';
+
+    const table = document.createElement('table');
+    table.className = 'visual-table';
+//   <tr><td colspan="4" class="period-header">Period ${p + 1}</td></tr>
+//<td>${getDiamondIcon('ALL','#000', 85)}</td>
+    table.innerHTML = `
+    
+      <tr>
+        <td><span style="font-size: 1.5em; font-weight: 600;">Period ${p + 1}</span></td>
+        <td class="visual-cell border-f bg-f">${rows['F']}</td>
+        <td></td>
+        <td class="visual-cell border-sub bg-sub" rowspan="2">${rows['SUB1']}</td>
+      </tr>
+      <tr>
+        <td class="visual-cell border-lw bg-lw">${rows['LW']}</td>
+        <td></td>
+        <td class="visual-cell border-rw bg-rw">${rows['RW']}</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td class="visual-cell border-d bg-d">${rows['D']}</td>
+        <td class="visual-cell border-sub bg-sub" rowspan="2">${rows['INLINE']}</td>
+		<td class="visual-cell border-sub bg-sub" rowspan="2">${rows['SUB2']}</td>        
+      </tr>
+      <tr>
+        <td></td>
+        <td class="visual-cell border-g bg-g">${rows['G']}</td>        
+      </tr>
+    `;
+
+    periodDiv.appendChild(table);
+    container.appendChild(periodDiv);
+  }
+}
 
 
 
@@ -1033,9 +1174,7 @@ function renderVisualSubView(schedule) {
 					grid[player][pos] = 0;
 				}
 			}
-			// console.log(players);
-			// console.log(positions);
-
+			
 			// Fill counts
 			for (let phase = 0; phase < phases; phase++) {
 				for (let pos = 0; pos < positions.length; pos++) {
