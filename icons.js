@@ -1,26 +1,46 @@
 
 
+// export function getDiamondIcon(pos = 'D', color = '#000', size = 22) {
+//   const positions = {
+//     'F': { cx: 12, cy: 4 },
+//     'LW': { cx: 4, cy: 12 },
+//     'RW': { cx: 20, cy: 12 },
+//     'D': { cx: 12, cy: 20 }
+//   };
+
+//   return `
+// <svg class="icon" style="color: ${color}; width: ${size}px; height: ${size}px;" 
+//      viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+//   <polygon points="12,4 20,12 12,20 4,12" fill="none" stroke="#aaa" stroke-width="0.0"/>
+//   ${Object.entries(positions).map(([key, { cx, cy }]) => {
+//     if (pos === 'ALL') {
+//       return `<circle cx="${cx}" cy="${cy}" r="2" fill="var(--color-${key.toLowerCase()})" stroke="#000" stroke-width="0"/>`;
+//     } else {
+//       const isActive = key === pos;
+//       return isActive
+//         ? `<circle cx="${cx}" cy="${cy}" r="4" fill="currentColor"/>`
+//         : `<circle cx="${cx}" cy="${cy}" r="2" fill="#999" stroke="#999" stroke-width="0.5"/>`;
+//     }
+//   }).join('')}
+// </svg>`;
+// }
 export function getDiamondIcon(pos = 'D', color = '#000', size = 22) {
   const positions = {
-    'F': { cx: 12, cy: 4 },
-    'LW': { cx: 4, cy: 12 },
-    'RW': { cx: 20, cy: 12 },
+    'F': { cx: 12, cy: 5 },
+    'LW': { cx: 5, cy: 13 },
+    'RW': { cx: 19, cy: 13 },
     'D': { cx: 12, cy: 20 }
   };
 
   return `
 <svg class="icon" style="color: ${color}; width: ${size}px; height: ${size}px;" 
-     viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+     viewBox="0 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg">
   <polygon points="12,4 20,12 12,20 4,12" fill="none" stroke="#aaa" stroke-width="0.0"/>
   ${Object.entries(positions).map(([key, { cx, cy }]) => {
-    if (pos === 'ALL') {
-      return `<circle cx="${cx}" cy="${cy}" r="2" fill="var(--color-${key.toLowerCase()})" stroke="#000" stroke-width="0"/>`;
-    } else {
-      const isActive = key === pos;
-      return isActive
-        ? `<circle cx="${cx}" cy="${cy}" r="4" fill="currentColor"/>`
-        : `<circle cx="${cx}" cy="${cy}" r="2" fill="#999" stroke="#999" stroke-width="0.5"/>`;
-    }
+    const isActive = key === pos;
+    return isActive
+      ? `<circle cx="${cx}" cy="${cy}" r="4" fill="#000" />`
+      : `<circle cx="${cx}" cy="${cy}" r="3.5" fill="none" stroke="#666" stroke-width="0.3"/>`;
   }).join('')}
 </svg>`;
 }

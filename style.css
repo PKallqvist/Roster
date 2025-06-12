@@ -24,6 +24,7 @@
 
     --glove-palm: #fbbb30;
     --glove-wrist-and-ball: #9a1f32;
+    --glove-wrist-and-ball: #555555;
     --glove-detail: #9e9798;
     --contour: #210e0f;
 
@@ -36,9 +37,9 @@ body {
     padding: 20px;
 }
 
-/* * {
+  /* * {
   outline: 1px solid red !important;
-}  */
+}    */
 
 .emoji-symbol {
     font-family: 'Noto Color Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
@@ -91,6 +92,37 @@ table.basic-grid td{
     padding: 2px 8px;
 }
 
+/* Label spacing */
+label {
+  font-weight: bold;
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+/* Styled input */
+#matchTitleInput {
+  width: 100%;
+  max-width: 500px;
+  padding: 10px 12px;
+  font-size: 1.1em;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+/* Styled select */
+#phasesPerPeriod {
+  padding: 8px 10px;
+  font-size: 1em;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background-color: #fff;
+  margin-top: 4px;
+}
+
+
+
 /* Role Borders */
 .border-g, .border-d, .border-lw, .border-rw, .border-f, .border-sub {
   border: 3px solid;
@@ -137,7 +169,7 @@ table.basic-grid td{
 .next-rw   { background-color: var(--next-rw); }
 .next-f    { background-color: var(--next-f); }
 .next-sub  { background-color: var(--next-sub); }
-
+.next-g, .next-d, .next-lw, .next-rw, .next-f, .next-sub  { background-color: #fff; }
 /* Swap Colors */
 .swap1      { background-color: #ffeeba; }
 .swap2      { background-color: #bee5eb; }
@@ -246,6 +278,11 @@ button.active-button {
   gap: 20px;
   align-items: flex-start;
   flex-wrap: wrap;
+  /* outline: 1px solid blue !important; */
+}
+.player-highlight {
+  background-color: #ffffcc;
+  font-weight: bold;
 }
 
 /* extra view  */
@@ -254,8 +291,19 @@ button.active-button {
   flex-direction: column;
   align-items: flex-start;
   width: 100%;              /* Fill available space */
-  max-width: 900px;          */
-  /* margin: 0 auto;*/           /* Optional: center in page */
+  max-width: 800px;          
+  /* margin: 0 auto;           /* Optional: center in page */
+  /* outline: 2px dashed green !important; */
+   
+}
+
+.visual-header {
+  width: 100%;
+  align-items: center;
+  text-align: center;
+  font-size: 1.5em;
+  font-weight: 600;  
+  padding-bottom: 1cm;
 }
 
 .visual-period {
@@ -265,8 +313,8 @@ button.active-button {
 
 .visual-period:not(:last-child) {
   border-bottom: 2px dashed #ccc;  
-  padding-bottom: 20px;
-  margin-bottom: 20px;
+  padding-bottom: 8px;
+   margin-bottom: 20px; 
 }
 
 /* .visual-period td {
@@ -281,6 +329,7 @@ button.active-button {
   width: 100%;              /* Ensures table spans parent */
   /* Makes cell widths consistent */
   /* table-layout: fixed;       */
+  table-layout: auto;
   /* border-collapse: collapse; */
   border-collapse: separate;      /* ← important */
   border-spacing: 4px;            
@@ -296,39 +345,59 @@ button.active-button {
   /* border: 1px dashed #ddd;  */
   border-radius: 24px;
   white-space: nowrap;
+  
 }
-.cell-content {
-  min-height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
+.visual-cell.wide {
+  /* min-width:100px; */
+  white-space: normal;
 }
+.dash {
+  border: 2px dashed #333;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.starting-player {
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
 .sub1 {
   /* border: 4px solid #c2f0c2; */
   /* border: 3px solid #3cb371; */
-  border: 3px solid #86cfa0;
+  /* border: 3px solid #86cfa0;
+  border: 3px solid #f9fa76; */
+  border: 2px solid #b2df8a;
   padding: 4PX 8px;
   border-radius: 8px;
-  /* background-color: #eef8f2; */
+  background-color: #eef8f2;
   display: flex; 
   justify-content: space-between; 
   align-items: center;
+  margin-top: 2px;
 
+}
+.sub1.centered{
+  justify-content: center; 
+  text-align: center;
 }
 .sub2 {
   /* border: 4px solid #c4e3ff; */
   border: 3px solid #4682b4;
   border: 3px solid #87addd;
-  
+  border: 2px solid #003366;
   padding: 4PX 8px;
   border-radius: 8px;
-  /* background-color: #e0e9ff; */
+  background-color: #e0e9ff;
   display: flex; 
   justify-content: space-between; 
   align-items: center;
+  margin-top: 2px;
 }
-
+.sub2.centered{
+  justify-content: center; 
+  text-align: center;
+}
 .sub-line {
   display: flex;
   align-items: center;
@@ -382,39 +451,69 @@ button.active-button {
 }
 
 
-
 @media print {
-  body * {
-    visibility: hidden !important;
+  @page {
+    size: A4 portrait;
+    margin: 0;
+    padding: 2cm;
+    padding-top: 1cm;
   }
-
-  #print-area-grid,
-  #print-area-visual {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+    body {
+    font-size: 85% !important;
+  }
+/* 
+  body > * {
     display: none !important;
-    visibility: hidden !important;
-  }
+  } */
 
-  #print-area-grid:has(table):not([style*="display: none"]),
-  #print-area-visual:has(table):not([style*="display: none"]) {
+#workPart {
+    display: none !important;
+  }
+  /* #print-area-visual {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    position: static !important;
     visibility: visible !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
-  #print-area-grid:has(table):not([style*="display: none"]) *:not(script),
-  #print-area-visual:has(table):not([style*="display: none"]) *:not(script) {
+  #print-area-visual * {
+    display: revert !important;
     visibility: visible !important;
-  }
-  .sub1, .sub2 {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+  } */
 
+ 
   .no-print {
     display: none !important;
   }
+
+ .visual-periods-wrapper,
+  .visual-period {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .sub1, .sub2 {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  /* .sub-line {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  
+}
+
+.sub-line .symbol {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+} */
 }
 
